@@ -1,0 +1,514 @@
+[
+  {
+    "id": "d68a4438",
+    "saved_at": "2026-07-22T21:22:48.598338",
+    "club_name": "Tech Innovation Club",
+    "meeting_date": "2026-07-22",
+    "transcript_preview": "Good afternoon everyone. Welcome to the weekly student club meeting. Today we need to discuss the upcoming technical workshop, promotional activities, venue arrangements, and volunteer responsibilities. First, regarding the technical workshop, we have decided to conduct an introduction to artificial intelligence and AI agents for second and third year students. The proposed date is the 25th of July. Karthik will prepare the workshop content and complete the presentation slides before the 21st of",
+    "mom_markdown": "---\n\n# 📋 Minutes of Meeting\n## Tech Innovation Club\n\n| | |\n|---|---|\n| **Date** | 2026-07-22 |\n| **Venue** | Not specified |\n| **Prepared By** | AI Meeting Assistant |\n\n---\n\n## 👥 Attendees\n* Karthik\n* Priya\n* Aaron\n* Mina\n* Sanjay\n* Arun\n* Meena\n* Other team leads (names not specified)\n\n---\n\n## 📌 Agenda\n1. Upcoming technical workshop\n2. Promotional activities\n3. Venue arrangements\n4. Volunteer responsibilities\n5. Budget estimation and approval\n6. Review of action items\n\n---\n\n## 💬 Key Discussions\nThe Tech Innovation Club decided to conduct an introduction to artificial intelligence and AI agents workshop for second and third-year students. The proposed date for the workshop is the 25th of July. The seminar hall is the preferred venue, with the main computer laboratory as a backup. Promotional activities include creating a poster and an online registration form. Volunteer roles include registration, technical support, photography, and participant coordination. The technical support team needs to check equipment one day before the event. The estimated budget for the event is 5,000 rupees.\n\n---\n\n## ✅ Decisions Made\n* Karthik will prepare the workshop content and presentation slides before the 21st of July.\n* Priya will confirm the seminar hall booking by Friday.\n* Aaron will design the event poster and share the first draft by tomorrow evening.\n* Mina will create the registration form and collect participant details.\n* Sanjay will prepare a detailed budget and submit it to the faculty coordinator for approval.\n* Team leads will submit the names of two volunteers before Monday.\n* Registration will close two days before the workshop.\n\n---\n\n## 📋 Action Items\n| # | Task | Assignee | Deadline | Priority |\n|---|------|----------|----------|----------|\n| 1 | Prepare the workshop content and complete the presentation slides | Karthik | 21st of July | High |\n| 2 | Contact the department coordinator and confirm the seminar hall booking | Priya | This Friday | High |\n| 3 | Design the event poster and share the first draft | Aaron | Tomorrow evening | Medium |\n| 4 | Create the registration form and collect participant details. Registration will close two days before the workshop | Mina | 23rd of July | Medium |\n| 5 | Submit the names of two volunteers | Team leads | Next Monday | Medium |\n| 6 | Check the projector, microphones, internet connection, and laptops | Technical support team | One day before the event | High |\n| 7 | Prepare a detailed budget and submit it to the faculty coordinator for approval | Sanjay | Before the event | High |\n\n---\n\n## 📝 Executive Summary\nThe Tech Innovation Club held a meeting to discuss and plan the upcoming technical workshop on artificial intelligence and AI agents. The meeting covered key aspects such as venue arrangements, promotional activities, volunteer responsibilities, and budget estimation. Decisions were made on task assignments, deadlines, and the next review meeting. The club aims to conduct a successful workshop on the 25th of July, with all preparations and tasks to be completed before the event. The next meeting will review the progress and finalize the arrangements. The club is working together to ensure a well-organized and informative workshop for the students.\n\n---\n\n## 📅 Next Meeting\nThe next review meeting is scheduled for the 22nd of July at 4 in the afternoon to check the presentation, registration count, venue confirmation, and event budget.\n\n---\n\n*Minutes compiled automatically by AI Meeting Assistant | 2026-07-22*",
+    "mom_data": {
+      "title": "Weekly Student Club Meeting for Tech Innovation Club",
+      "club_name": "Tech Innovation Club",
+      "date": "2026-07-22",
+      "venue": "Not specified",
+      "attendees": [
+        "Karthik",
+        "Priya",
+        "Aaron",
+        "Mina",
+        "Sanjay",
+        "Arun",
+        "Meena",
+        "and other team leads (names not specified)"
+      ],
+      "agenda_items": [],
+      "key_discussions": [
+        "The club decided to conduct an introduction to artificial intelligence and AI agents workshop for second and third-year students.",
+        "The proposed date for the workshop is the 25th of July.",
+        "The seminar hall is the preferred venue, with the main computer laboratory as a backup.",
+        "Promotional activities include creating a poster and an online registration form.",
+        "Volunteer roles include registration, technical support, photography, and participant coordination.",
+        "The technical support team needs to check equipment one day before the event.",
+        "The estimated budget for the event is 5,000 rupees."
+      ],
+      "decisions": [
+        "Karthik will prepare the workshop content and presentation slides before the 21st of July.",
+        "Priya will confirm the seminar hall booking by Friday.",
+        "Aaron will design the event poster and share the first draft by tomorrow evening.",
+        "Mina will create the registration form and collect participant details.",
+        "Sanjay will prepare a detailed budget and submit it to the faculty coordinator for approval.",
+        "Team leads will submit the names of two volunteers before Monday.",
+        "Registration will close two days before the workshop."
+      ],
+      "action_items": [
+        {
+          "task": "Prepare the workshop content and complete the presentation slides",
+          "assignee": "Karthik",
+          "deadline": "21st of July",
+          "priority": "High",
+          "notes": "Includes a short demonstration using long chain and Landgraf"
+        },
+        {
+          "task": "Contact the department coordinator and confirm the seminar hall booking",
+          "assignee": "Priya",
+          "deadline": "this Friday",
+          "priority": "High",
+          "notes": null
+        },
+        {
+          "task": "Design the event poster and share the first draft",
+          "assignee": "Aaron",
+          "deadline": "tomorrow evening",
+          "priority": "Medium",
+          "notes": null
+        },
+        {
+          "task": "Create the registration form and collect participant details. Registration will close two days before the workshop",
+          "assignee": "Mina",
+          "deadline": "23rd of July",
+          "priority": "Medium",
+          "notes": null
+        },
+        {
+          "task": "Submit the names of two volunteers",
+          "assignee": "Team leads",
+          "deadline": "next Monday",
+          "priority": "Medium",
+          "notes": null
+        },
+        {
+          "task": "Check the projector, microphones, internet connection, and laptops",
+          "assignee": "Technical support team",
+          "deadline": "one day before the event",
+          "priority": "High",
+          "notes": null
+        },
+        {
+          "task": "Prepare a detailed budget and submit it to the faculty coordinator for approval",
+          "assignee": "Sanjay",
+          "deadline": "before the event",
+          "priority": "High",
+          "notes": "Estimated budget is 5,000 rupees"
+        }
+      ],
+      "summary": "---\n\n# 📋 Minutes of Meeting\n## Tech Innovation Club\n\n| | |\n|---|---|\n| **Date** | 2026-07-22 |\n| **Venue** | Not specified |\n| **Prepared By** | AI Meeting Assistant |\n\n---\n\n## 👥 Attendees\n* Karthik\n* Priya\n* Aaron\n* Mina\n* Sanjay\n* Arun\n* Meena\n* Other team leads (names not specified)\n\n---\n\n## 📌 Ag",
+      "next_meeting": "N/A"
+    },
+    "action_items": [
+      {
+        "task": "Prepare the workshop content and complete the presentation slides",
+        "assignee": "Karthik",
+        "deadline": "21st of July",
+        "priority": "High",
+        "notes": "Includes a short demonstration using long chain and Landgraf"
+      },
+      {
+        "task": "Contact the department coordinator and confirm the seminar hall booking",
+        "assignee": "Priya",
+        "deadline": "this Friday",
+        "priority": "High",
+        "notes": null
+      },
+      {
+        "task": "Design the event poster and share the first draft",
+        "assignee": "Aaron",
+        "deadline": "tomorrow evening",
+        "priority": "Medium",
+        "notes": null
+      },
+      {
+        "task": "Create the registration form and collect participant details. Registration will close two days before the workshop",
+        "assignee": "Mina",
+        "deadline": "23rd of July",
+        "priority": "Medium",
+        "notes": null
+      },
+      {
+        "task": "Submit the names of two volunteers",
+        "assignee": "Team leads",
+        "deadline": "next Monday",
+        "priority": "Medium",
+        "notes": null
+      },
+      {
+        "task": "Check the projector, microphones, internet connection, and laptops",
+        "assignee": "Technical support team",
+        "deadline": "one day before the event",
+        "priority": "High",
+        "notes": null
+      },
+      {
+        "task": "Prepare a detailed budget and submit it to the faculty coordinator for approval",
+        "assignee": "Sanjay",
+        "deadline": "before the event",
+        "priority": "High",
+        "notes": "Estimated budget is 5,000 rupees"
+      }
+    ],
+    "action_item_count": 7,
+    "high_priority_count": 4,
+    "workflow_log": [],
+    "word_count": 593
+  },
+  {
+    "id": "7c709422",
+    "saved_at": "2026-07-15T23:15:17.904235",
+    "club_name": "Navigate Labs",
+    "meeting_date": "2026-07-15",
+    "transcript_preview": "Good afternoon everyone. Welcome to the weekly student club meeting. Today we need to discuss the upcoming technical workshop, promotional activities, venue arrangements, and volunteer responsibilities. First, regarding the technical workshop, we have decided to conduct an introduction to artificial intelligence and AI agents for second and third year students. The proposed date is the 25th of July. Karthik will prepare the workshop content and complete the presentation slides before the 21st of",
+    "mom_markdown": "# 📋 Minutes of Meeting\n## Navigate Labs\n\n| | |\n|---|---|\n| **Date** | 2026-07-15 |\n| **Venue** | Not specified |\n| **Prepared By** | AI Meeting Assistant |\n\n---\n\n## 👥 Attendees\n* Karthik\n* Priya\n* Aaron\n* Mina\n* Sanjay\n* Arun\n* Meena\n* Other team leads\n\n---\n\n## 📌 Agenda\n1. Introduction to the meeting and overview of topics to be discussed\n2. Technical workshop details\n3. Promotional activities\n4. Venue arrangements\n5. Volunteer responsibilities\n6. Budget estimation and approval\n7. Review of action items\n\n---\n\n## 💬 Key Discussions\nThe club is organizing a technical workshop on an introduction to artificial intelligence and AI agents. The proposed date for the workshop is the 25th of July. The seminar hall is the preferred venue, with the main computer laboratory as a backup. Promotional activities include creating a poster and an online registration form. Volunteer roles are needed for registration, technical support, photography, and participant coordination. A detailed budget needs to be prepared for approval.\n\n---\n\n## ✅ Decisions Made\n* To conduct a technical workshop on an introduction to artificial intelligence and AI agents for second and third-year students on the 25th of July.\n* Karthik will prepare the workshop content and presentation slides by the 21st of July.\n* Priya will confirm the seminar hall booking by Friday.\n* Aaron (or Arun) will design the event poster and share the first draft by the next evening.\n* Mina (or Meena) will create the registration form and manage participant details.\n* Registration will close two days before the workshop.\n* Each team lead will submit the names of two volunteers by Monday.\n* Sanjay will prepare a detailed budget and submit it for approval.\n* The technical support team will check the projector, microphones, internet connection, and laptops a day before the event.\n\n---\n\n## 📋 Action Items\n| # | Task | Assignee | Deadline | Priority |\n|---|------|----------|----------|----------|\n| 1 | Prepare the workshop content and complete the presentation slides | Karthik | 21st of July | High |\n| 2 | Prepare a short demonstration using long chain and Landgraf | Karthik | 21st of July | High |\n| 3 | Confirm the seminar hall booking | Priya | Friday | High |\n| 4 | Design the event poster and share the first draft | Aaron | Tomorrow evening | Medium |\n| 5 | Create the registration form and collect participant details | Mina | 23rd of July | High |\n| 6 | Submit the names of two volunteers | Each team lead | Monday | Medium |\n| 7 | Check the projector, microphones, internet connection, and laptops | Technical support team | One day before the event | High |\n| 8 | Prepare a detailed budget and submit it for approval | Sanjay | 21st of July | High |\n\n---\n\n## 📝 Executive Summary\nThe Navigate Labs student club held a meeting to discuss the upcoming technical workshop on artificial intelligence and AI agents. The workshop is scheduled for the 25th of July, and various tasks such as content preparation, venue booking, poster design, registration form creation, and budget preparation were assigned to different members. The club also discussed the need for volunteers for various roles and set deadlines for task completion. A follow-up meeting is scheduled for the 22nd of July to review progress. The meeting aimed to organize a successful technical workshop for second and third-year students, covering all logistical, promotional, and content-related aspects.\n\n---\n\n## 📅 Next Meeting\nThe next review meeting is scheduled for the 22nd of July at 4 in the afternoon to check the presentation, registration count, venue confirmation, and event budget.\n\n*Minutes compiled automatically by AI Meeting Assistant | 2026-07-15*",
+    "mom_data": {
+      "title": "Weekly Student Club Meeting for Navigate Labs",
+      "club_name": "Navigate Labs",
+      "date": "2026-07-15",
+      "venue": "Not specified",
+      "attendees": [
+        "Karthik",
+        "Priya",
+        "Aaron",
+        "Mina",
+        "Sanjay",
+        "Arun",
+        "Meena",
+        "and other team leads (note: some names seem to be used interchangeably",
+        "e.g.",
+        "Arun and Aaron",
+        "Meena and Mina",
+        "which might be a transcription error)"
+      ],
+      "agenda_items": [],
+      "key_discussions": [
+        "The club is organizing a technical workshop on an introduction to artificial intelligence and AI agents.",
+        "The proposed date for the workshop is the 25th of July.",
+        "The seminar hall is the preferred venue, with the main computer laboratory as a backup.",
+        "Promotional activities include creating a poster and an online registration form.",
+        "Volunteer roles are needed for registration, technical support, photography, and participant coordination.",
+        "A detailed budget needs to be prepared for approval."
+      ],
+      "decisions": [
+        "To conduct a technical workshop on an introduction to artificial intelligence and AI agents for second and third-year students on the 25th of July.",
+        "Karthik will prepare the workshop content and presentation slides by the 21st of July.",
+        "Priya will confirm the seminar hall booking by Friday.",
+        "Aaron (or Arun) will design the event poster and share the first draft by the next evening.",
+        "Mina (or Meena) will create the registration form and manage participant details.",
+        "Registration will close two days before the workshop.",
+        "Each team lead will submit the names of two volunteers by Monday.",
+        "Sanjay will prepare a detailed budget and submit it for approval.",
+        "The technical support team will check the projector, microphones, internet connection, and laptops a day before the event."
+      ],
+      "action_items": [
+        {
+          "task": "Prepare the workshop content and complete the presentation slides",
+          "assignee": "Karthik",
+          "deadline": "21st of July",
+          "priority": "High",
+          "notes": "Introduction to artificial intelligence and AI agents"
+        },
+        {
+          "task": "Prepare a short demonstration using long chain and Landgraf",
+          "assignee": "Karthik",
+          "deadline": "21st of July",
+          "priority": "High",
+          "notes": "For the technical workshop"
+        },
+        {
+          "task": "Confirm the seminar hall booking",
+          "assignee": "Priya",
+          "deadline": "Friday",
+          "priority": "High",
+          "notes": "First preference for the workshop venue"
+        },
+        {
+          "task": "Design the event poster and share the first draft",
+          "assignee": "Aaron",
+          "deadline": "Tomorrow evening",
+          "priority": "Medium",
+          "notes": "For promotional activities"
+        },
+        {
+          "task": "Create the registration form and collect participant details",
+          "assignee": "Mina",
+          "deadline": "23rd of July",
+          "priority": "High",
+          "notes": "Registration will close two days before the workshop"
+        },
+        {
+          "task": "Submit the names of two volunteers",
+          "assignee": "Each team lead",
+          "deadline": "24th of July",
+          "priority": "Medium",
+          "notes": "For registration, technical support, photography, and participant coordination"
+        },
+        {
+          "task": "Check the projector, microphones, internet connection, and laptops",
+          "assignee": "Technical support team",
+          "deadline": "One day before the event",
+          "priority": "High",
+          "notes": "To ensure technical readiness"
+        },
+        {
+          "task": "Prepare a detailed budget and submit it for approval",
+          "assignee": "Sanjay",
+          "deadline": "21st of July",
+          "priority": "High",
+          "notes": "Estimated budget is 5,000 rupees"
+        }
+      ],
+      "summary": "# 📋 Minutes of Meeting\n## Navigate Labs\n\n| | |\n|---|---|\n| **Date** | 2026-07-15 |\n| **Venue** | Not specified |\n| **Prepared By** | AI Meeting Assistant |\n\n---\n\n## 👥 Attendees\n* Karthik\n* Priya\n* Aaron\n* Mina\n* Sanjay\n* Arun\n* Meena\n* Other team leads\n\n---\n\n## 📌 Agenda\n1. Introduction to the meetin",
+      "next_meeting": "N/A"
+    },
+    "action_items": [
+      {
+        "task": "Prepare the workshop content and complete the presentation slides",
+        "assignee": "Karthik",
+        "deadline": "21st of July",
+        "priority": "High",
+        "notes": "Introduction to artificial intelligence and AI agents"
+      },
+      {
+        "task": "Prepare a short demonstration using long chain and Landgraf",
+        "assignee": "Karthik",
+        "deadline": "21st of July",
+        "priority": "High",
+        "notes": "For the technical workshop"
+      },
+      {
+        "task": "Confirm the seminar hall booking",
+        "assignee": "Priya",
+        "deadline": "Friday",
+        "priority": "High",
+        "notes": "First preference for the workshop venue"
+      },
+      {
+        "task": "Design the event poster and share the first draft",
+        "assignee": "Aaron",
+        "deadline": "Tomorrow evening",
+        "priority": "Medium",
+        "notes": "For promotional activities"
+      },
+      {
+        "task": "Create the registration form and collect participant details",
+        "assignee": "Mina",
+        "deadline": "23rd of July",
+        "priority": "High",
+        "notes": "Registration will close two days before the workshop"
+      },
+      {
+        "task": "Submit the names of two volunteers",
+        "assignee": "Each team lead",
+        "deadline": "24th of July",
+        "priority": "Medium",
+        "notes": "For registration, technical support, photography, and participant coordination"
+      },
+      {
+        "task": "Check the projector, microphones, internet connection, and laptops",
+        "assignee": "Technical support team",
+        "deadline": "One day before the event",
+        "priority": "High",
+        "notes": "To ensure technical readiness"
+      },
+      {
+        "task": "Prepare a detailed budget and submit it for approval",
+        "assignee": "Sanjay",
+        "deadline": "21st of July",
+        "priority": "High",
+        "notes": "Estimated budget is 5,000 rupees"
+      }
+    ],
+    "action_item_count": 8,
+    "high_priority_count": 6,
+    "workflow_log": [],
+    "word_count": 635
+  },
+  {
+    "id": "59845ca2",
+    "saved_at": "2026-07-15T22:10:28.342200",
+    "club_name": "Tech Innovation Club",
+    "meeting_date": "July 15, 2026",
+    "transcript_preview": "Good afternoon everyone. Welcome to the weekly student club meeting. Today we need to discuss the upcoming technical workshop, promotional activities, venue arrangements, and volunteer responsibilities. First, regarding the technical workshop, we have decided to conduct an introduction to artificial intelligence and AI agents for second and third year students. The proposed date is the 25th of July. Karthik will prepare the workshop content and complete the presentation slides before the 21st of",
+    "mom_markdown": "# 📋 Minutes of Meeting\n## Tech Innovation Club\n\n| | |\n|---|---|\n| **Date** | July 15, 2026 |\n| **Venue** | Not specified |\n| **Prepared By** | AI Meeting Assistant |\n\n---\n\n## 👥 Attendees\n* Karthik\n* Priya\n* Aaron\n* Mina\n* Sanjay\n* Arun\n* Meena\n* Other team leads (names not specified)\n\n---\n\n## 📌 Agenda\n1. Upcoming technical workshop\n2. Promotional activities\n3. Venue arrangements\n4. Volunteer responsibilities\n5. Budget estimation and approval\n6. Review of action items\n\n---\n\n## 💬 Key Discussions\nThe club is organizing a technical workshop on an introduction to artificial intelligence and AI agents for second and third-year students. The proposed date for the workshop is the 25th of July. The seminar hall is the preferred venue, with the main computer laboratory as a backup option. Promotional activities include creating a poster and an online registration form. Volunteer roles are needed for registration, technical support, photography, and participant coordination. The technical support team must check the projector, microphones, internet connection, and laptops before the event.\n\n---\n\n## ✅ Decisions Made\n* Karthik will prepare the workshop content and complete the presentation slides before the 21st of July.\n* Priya will contact the department coordinator and confirm the seminar hall booking by Friday.\n* Aaron will design the event poster and share the first draft in the club group by tomorrow evening.\n* Mina will create the registration form and collect participant details.\n* Sanjay will prepare a detailed budget and submit it to the faculty coordinator for approval.\n* Team leads will submit the names of two volunteers before Monday.\n* The estimated budget for the event is 5,000 rupees.\n\n---\n\n## 📋 Action Items\n| # | Task | Assignee | Deadline | Priority |\n|---|------|----------|----------|----------|\n| 1 | Prepare the workshop content and complete the presentation slides | Karthik | 21st of July | High |\n| 2 | Contact the department coordinator and confirm the seminar hall booking | Priya | Friday before 22nd of July | High |\n| 3 | Design the event poster and share the first draft in the club group | Arun | Tomorrow evening | Medium |\n| 4 | Create the registration form and collect participant details | Meena | 23rd of July | Medium |\n| 5 | Prepare a detailed budget and submit it to the faculty coordinator for approval | Sanjay | 22nd of July | High |\n| 6 | Submit the names of two volunteers | Individual Team Leads | Monday | Medium |\n| 7 | Check the projector, microphones, internet connection, and laptops | Technical support team | One day before the event | High |\n\n---\n\n## 📝 Executive Summary\nThe Tech Innovation Club held a meeting to discuss the upcoming technical workshop on artificial intelligence and AI agents. The club decided on the workshop's date, venue, and promotional activities, and assigned tasks to members, including content preparation, venue booking, poster design, and budget preparation. The meeting aimed to organize the workshop, which is scheduled for July 25th, and a review meeting is set for July 22nd to ensure everything is on track. The club has a clear plan in place, with assigned responsibilities and deadlines to ensure the workshop's success. The estimated budget for the event is 5,000 rupees, and team leads are required to submit the names of two volunteers before Monday.\n\n---\n\n## 📅 Next Meeting\nThe next review meeting is scheduled for the 22nd of July at 4 in the afternoon to check the presentation, registration count, venue confirmation, and event budget.\n\n---\n*Minutes compiled automatically by AI Meeting Assistant | July 15, 2026*",
+    "mom_data": {
+      "title": "Weekly Student Club Meeting - Tech Innovation Club",
+      "club_name": "Tech Innovation Club",
+      "date": "July 15, 2026",
+      "venue": "Not specified",
+      "attendees": [
+        "Karthik",
+        "Priya",
+        "Aaron",
+        "Mina",
+        "Sanjay",
+        "Arun",
+        "Meena",
+        "and other team leads (names not specified)"
+      ],
+      "agenda_items": [],
+      "key_discussions": [
+        "The club is organizing a technical workshop on an introduction to artificial intelligence and AI agents for second and third-year students.",
+        "The proposed date for the workshop is the 25th of July.",
+        "The seminar hall is the preferred venue, with the main computer laboratory as a backup option.",
+        "Promotional activities include creating a poster and an online registration form.",
+        "Volunteer roles are needed for registration, technical support, photography, and participant coordination.",
+        "The technical support team must check the projector, microphones, internet connection, and laptops before the event."
+      ],
+      "decisions": [
+        "Karthik will prepare the workshop content and complete the presentation slides before the 21st of July.",
+        "Priya will contact the department coordinator and confirm the seminar hall booking by Friday.",
+        "Aaron will design the event poster and share the first draft in the club group by tomorrow evening.",
+        "Mina will create the registration form and collect participant details.",
+        "Sanjay will prepare a detailed budget and submit it to the faculty coordinator for approval.",
+        "Team leads will submit the names of two volunteers before Monday.",
+        "The estimated budget for the event is 5,000 rupees."
+      ],
+      "action_items": [
+        {
+          "task": "Prepare the workshop content and complete the presentation slides",
+          "assignee": "Karthik",
+          "deadline": "21st of July",
+          "priority": "High",
+          "notes": "Includes a short demonstration using long chain and Landgraf"
+        },
+        {
+          "task": "Contact the department coordinator and confirm the seminar hall booking",
+          "assignee": "Priya",
+          "deadline": "Friday before 22nd of July",
+          "priority": "High",
+          "notes": null
+        },
+        {
+          "task": "Design the event poster and share the first draft in the club group",
+          "assignee": "Arun",
+          "deadline": "Tomorrow evening",
+          "priority": "Medium",
+          "notes": null
+        },
+        {
+          "task": "Create the registration form and collect participant details",
+          "assignee": "Meena",
+          "deadline": "23rd of July",
+          "priority": "Medium",
+          "notes": "Registration will close two days before the workshop"
+        },
+        {
+          "task": "Prepare a detailed budget and submit it to the faculty coordinator for approval",
+          "assignee": "Sanjay",
+          "deadline": "22nd of July",
+          "priority": "High",
+          "notes": "Estimated budget for the event is 5,000 rupees"
+        },
+        {
+          "task": "Submit the names of two volunteers",
+          "assignee": "Individual Team Leads",
+          "deadline": "Monday",
+          "priority": "Medium",
+          "notes": "For registration, technical support, photography, and participant coordination"
+        },
+        {
+          "task": "Check the projector, microphones, internet connection, and laptops",
+          "assignee": "Technical support team",
+          "deadline": "One day before the event",
+          "priority": "High",
+          "notes": null
+        }
+      ],
+      "summary": "# 📋 Minutes of Meeting\n## Tech Innovation Club\n\n| | |\n|---|---|\n| **Date** | July 15, 2026 |\n| **Venue** | Not specified |\n| **Prepared By** | AI Meeting Assistant |\n\n---\n\n## 👥 Attendees\n* Karthik\n* Priya\n* Aaron\n* Mina\n* Sanjay\n* Arun\n* Meena\n* Other team leads (names not specified)\n\n---\n\n## 📌 Agen",
+      "next_meeting": "N/A"
+    },
+    "action_items": [
+      {
+        "task": "Prepare the workshop content and complete the presentation slides",
+        "assignee": "Karthik",
+        "deadline": "21st of July",
+        "priority": "High",
+        "notes": "Includes a short demonstration using long chain and Landgraf"
+      },
+      {
+        "task": "Contact the department coordinator and confirm the seminar hall booking",
+        "assignee": "Priya",
+        "deadline": "Friday before 22nd of July",
+        "priority": "High",
+        "notes": null
+      },
+      {
+        "task": "Design the event poster and share the first draft in the club group",
+        "assignee": "Arun",
+        "deadline": "Tomorrow evening",
+        "priority": "Medium",
+        "notes": null
+      },
+      {
+        "task": "Create the registration form and collect participant details",
+        "assignee": "Meena",
+        "deadline": "23rd of July",
+        "priority": "Medium",
+        "notes": "Registration will close two days before the workshop"
+      },
+      {
+        "task": "Prepare a detailed budget and submit it to the faculty coordinator for approval",
+        "assignee": "Sanjay",
+        "deadline": "22nd of July",
+        "priority": "High",
+        "notes": "Estimated budget for the event is 5,000 rupees"
+      },
+      {
+        "task": "Submit the names of two volunteers",
+        "assignee": "Individual Team Leads",
+        "deadline": "Monday",
+        "priority": "Medium",
+        "notes": "For registration, technical support, photography, and participant coordination"
+      },
+      {
+        "task": "Check the projector, microphones, internet connection, and laptops",
+        "assignee": "Technical support team",
+        "deadline": "One day before the event",
+        "priority": "High",
+        "notes": null
+      }
+    ],
+    "action_item_count": 7,
+    "high_priority_count": 4,
+    "workflow_log": [
+      {
+        "node": "meeting_analyzer",
+        "detail": "Analysis generated (2478 chars)",
+        "status": "complete"
+      },
+      {
+        "node": "action_extractor",
+        "detail": "7 action item(s) extracted",
+        "status": "complete"
+      },
+      {
+        "node": "validator",
+        "detail": "4 validation issue(s) found",
+        "status": "complete"
+      },
+      {
+        "node": "reanalyzer",
+        "detail": "Issues corrected, re-validating...",
+        "status": "complete"
+      },
+      {
+        "node": "validator",
+        "detail": "5 validation issue(s) found",
+        "status": "complete"
+      },
+      {
+        "node": "reanalyzer",
+        "detail": "Issues corrected, re-validating...",
+        "status": "complete"
+      },
+      {
+        "node": "validator",
+        "detail": "4 validation issue(s) found",
+        "status": "complete"
+      },
+      {
+        "node": "mom_generator",
+        "detail": "MoM generated (3627 chars)",
+        "status": "complete"
+      }
+    ],
+    "word_count": 619
+  }
+]
