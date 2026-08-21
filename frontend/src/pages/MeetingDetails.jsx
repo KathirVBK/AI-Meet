@@ -48,7 +48,7 @@ export default function MeetingDetails() {
   const [meeting, setMeeting] = useState(null);
   const [editingClub, setEditingClub] = useState(false);
   const [clubEditValue, setClubEditValue] = useState('');
-  const [activeTab, setActiveTab] = useState('Summary');
+  const [activeTab, setActiveTab] = useState('Dashboard');
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleEditValue, setTitleEditValue] = useState('');
   const [isApproved, setIsApproved] = useState(false);
@@ -192,7 +192,7 @@ export default function MeetingDetails() {
     return acc;
   }, {});
 
-  const tabs = ['Summary', 'Minutes', 'Speaker Transcript', 'Action Items'];
+  const tabs = ['Dashboard', 'Minutes of Meeting', 'Speaker Transcript'];
 
   if (!meeting) return <div style={{ padding: '2rem' }}>Loading...</div>;
 
@@ -227,15 +227,7 @@ export default function MeetingDetails() {
         </div>
       </div>
 
-      {/* Status chips row */}
-      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
-        {Object.entries({ Assigned: 0, Accepted: 0, Pending: 0, TBD: 0, ...statusCounts }).map(([k, v]) => (
-          <div key={k} className="card" style={{ padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', margin: 0 }}>
-            <StatusBadge status={k} />
-            <div style={{ fontSize: '1.25rem', fontWeight: '700' }}>{v}</div>
-          </div>
-        ))}
-      </div>
+
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 1fr)', gap: '2rem' }}>
         <div>
@@ -254,7 +246,7 @@ export default function MeetingDetails() {
                 }}
               >
                 {t}
-                {t === 'Action Items' && (
+                {t === 'Action Plan' && (
                   <span style={{
                     background: 'var(--danger)', color: 'white', borderRadius: '999px',
                     padding: '0.1rem 0.4rem', fontSize: '0.7rem', marginLeft: '0.5rem',
@@ -265,16 +257,33 @@ export default function MeetingDetails() {
           </div>
 
           <div className="card" style={{ minHeight: '400px' }}>
-            {activeTab === 'Summary' && (
+            {activeTab === 'Dashboard' && (
               <div>
-                <h3 style={{ marginBottom: '1rem', color: 'var(--primary)', fontWeight: '700', fontSize: '1rem' }}>Executive Summary</h3>
+                {/* Meeting Overview */}
+                <h3 style={{ marginBottom: '1rem', color: 'var(--primary)', fontWeight: '700', fontSize: '1rem' }}>Meeting Overview</h3>
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+                  <div style={{ flex: 1, padding: '1.25rem', background: 'var(--neutral-bg-alt, #f9fafb)', borderRadius: '8px', border: '1px solid var(--border)', textAlign: 'center' }}>
+                    <div style={{ color: 'var(--neutral-text-muted)', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Duration</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary)' }}>{meeting.mom_data?.duration_minutes || meeting.word_count ? `${Math.round((meeting.word_count || 2250) / 150)} min` : 'N/A'}</div>
+                  </div>
+                  <div style={{ flex: 1, padding: '1.25rem', background: 'var(--neutral-bg-alt, #f9fafb)', borderRadius: '8px', border: '1px solid var(--border)', textAlign: 'center' }}>
+                    <div style={{ color: 'var(--neutral-text-muted)', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Attendees</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary)' }}>{participants.length}</div>
+                  </div>
+                  <div style={{ flex: 1, padding: '1.25rem', background: 'var(--neutral-bg-alt, #f9fafb)', borderRadius: '8px', border: '1px solid var(--border)', textAlign: 'center' }}>
+                    <div style={{ color: 'var(--neutral-text-muted)', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Actions</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary)' }}>{actionItems.length}</div>
+                  </div>
+                </div>
+
+                <h3 style={{ marginBottom: '1rem', color: 'var(--primary)', fontWeight: '700', fontSize: '1rem' }}>Summary</h3>
                 <div className="markdown-content" style={{ lineHeight: '1.7', color: 'var(--neutral-text)', marginBottom: '2rem' }}>
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {meeting.mom_data?.executive_summary || meeting.mom_data?.summary || 'No summary available.'}
                   </ReactMarkdown>
                 </div>
 
-                <h3 style={{ marginBottom: '1rem', color: 'var(--success)', fontWeight: '700', fontSize: '1rem' }}>Key Decisions</h3>
+                <h3 style={{ marginBottom: '1rem', color: 'var(--success)', fontWeight: '700', fontSize: '1rem' }}>Decisions</h3>
                 <ul style={{ paddingLeft: '1.5rem', lineHeight: '1.7', marginBottom: '2rem', color: 'var(--neutral-text)' }}>
                   {(meeting.mom_data?.key_decisions || meeting.mom_data?.decisions || []).length > 0
                     ? (meeting.mom_data?.key_decisions || meeting.mom_data?.decisions || []).map((kd, i) => (
@@ -282,10 +291,120 @@ export default function MeetingDetails() {
                       ))
                     : <li>No key decisions recorded.</li>}
                 </ul>
+
+                <h3 style={{ marginBottom: '1rem', color: 'var(--primary)', fontWeight: '700', fontSize: '1rem' }}>Action Plan</h3>
+                {actionItems.length > 0 ? (
+                  <div style={{ width: '100%', marginBottom: '2rem' }}>
+                    {(() => {
+                      const getDeadlineCategory = (deadlineStr) => {
+                        if (!deadlineStr || deadlineStr.toLowerCase() === 'not specified') return 'UPCOMING';
+                        const d = new Date(deadlineStr);
+                        if (isNaN(d.getTime())) return 'UPCOMING';
+                        const now = new Date();
+                        now.setHours(0,0,0,0);
+                        const diffTime = d.getTime() - now.getTime();
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        if (diffDays < 0) return 'OVERDUE';
+                        if (diffDays <= 3) return 'DUE SOON';
+                        return 'UPCOMING';
+                      };
+
+                      const groups = { 'OVERDUE': [], 'DUE SOON': [], 'UPCOMING': [] };
+                      actionItems.forEach(ai => {
+                        groups[getDeadlineCategory(ai.deadline)].push(ai);
+                      });
+
+                      return ['OVERDUE', 'DUE SOON', 'UPCOMING'].map(cat => {
+                        const items = groups[cat];
+                        if (items.length === 0) return null;
+                        const icon = cat === 'OVERDUE' ? '🔴' : cat === 'DUE SOON' ? '🟠' : '🟢';
+                        
+                        return (
+                          <div key={cat} style={{ marginBottom: '1.5rem' }}>
+                            <h4 style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--neutral-text-muted)', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>
+                              {cat} {icon}
+                            </h4>
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: '40px 2.5fr 1.25fr 1fr 0.75fr 1fr',
+                              gap: '1rem',
+                              padding: '0.5rem 0',
+                              borderBottom: '1px solid var(--border)',
+                              fontSize: '0.75rem',
+                              color: 'var(--neutral-text-muted)',
+                              fontWeight: '700',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.04em',
+                            }}>
+                              <div>#</div>
+                              <div>Task</div>
+                              <div>Owner</div>
+                              <div>Deadline</div>
+                              <div>Priority</div>
+                              <div>Status</div>
+                            </div>
+                            {items.map((ai, i) => {
+                              const who = ai.owner || ai.person || ai.assignee || 'TBD';
+                              const color = hashColor(who);
+                              return (
+                                <div key={i} style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '40px 2.5fr 1.25fr 1fr 0.75fr 1fr',
+                                  gap: '1rem',
+                                  padding: '1rem 0',
+                                  borderBottom: '1px solid var(--border)',
+                                  alignItems: 'start',
+                                }}>
+                                  <div style={{ fontWeight: '600', color: 'var(--neutral-text-muted)' }}>{i + 1}</div>
+                                  <div>
+                                    <div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>{ai.task}</div>
+                                    {ai.notes && <div style={{ fontSize: '0.8rem', color: 'var(--neutral-text-muted)', marginBottom: '0.5rem' }}>{ai.notes}</div>}
+                                    {ai.evidence && (
+                                      <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--neutral-bg-alt, #f9fafb)', borderRadius: '6px', borderLeft: '3px solid var(--primary)', fontSize: '0.8rem' }}>
+                                        <div style={{ fontWeight: '600', color: 'var(--neutral-text)', marginBottom: '0.25rem' }}>Evidence from meeting:</div>
+                                        <div style={{ color: 'var(--neutral-text-muted)', fontStyle: 'italic', marginBottom: '0.5rem' }}>"{ai.evidence}"</div>
+                                        <button 
+                                          onClick={() => setActiveTab('Speaker Transcript')} 
+                                          style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontWeight: '600', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                                        >
+                                          [View in Transcript]
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                      <div style={{
+                                        width: '24px', height: '24px', borderRadius: '50%',
+                                        background: color, color: 'white',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontWeight: '700', fontSize: '0.7rem',
+                                      }}>{who.charAt(0).toUpperCase()}</div>
+                                      <div style={{ fontWeight: '600' }}>{who}</div>
+                                    </div>
+                                  </div>
+                                  <div style={{ color: 'var(--neutral-text-muted)', fontSize: '0.9rem' }}>{ai.deadline || 'Not specified'}</div>
+                                  <div>
+                                    <span className={`badge ${(ai.priority || 'medium').toLowerCase() === 'high' ? 'high' : (ai.priority || 'medium').toLowerCase() === 'medium' ? 'med' : 'low'}`}>
+                                      {ai.priority || 'Medium'}
+                                    </span>
+                                  </div>
+                                  <div><StatusBadge status={ai.status || 'Assigned'} /></div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--neutral-text-muted)' }}>No action items extracted.</p>
+                )}
               </div>
             )}
 
-            {activeTab === 'Minutes' && (
+            {activeTab === 'Minutes of Meeting' && (
               <div>
                 <h3 style={{ marginBottom: '1rem' }}>Generated Minutes</h3>
                 <div className="markdown-content" style={{ lineHeight: '1.6' }}>
@@ -348,115 +467,12 @@ export default function MeetingDetails() {
               </div>
             )}
 
-            {activeTab === 'Action Items' && (
-              <div>
-                <h3 style={{ marginBottom: '1rem' }}>
-                  Action Items Extracted
-                  <span style={{ fontSize: '0.8rem', color: 'var(--neutral-text-muted)', marginLeft: '0.5rem', fontWeight: '400' }}>
-                    – Ownership resolved via speaker-identification rules
-                  </span>
-                </h3>
-                {actionItems.length > 0 ? (
-                  <div style={{ width: '100%' }}>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: '40px 2.5fr 1.25fr 1fr 0.75fr 1fr',
-                      gap: '1rem',
-                      padding: '0.5rem 0',
-                      borderBottom: '1px solid var(--border)',
-                      fontSize: '0.75rem',
-                      color: 'var(--neutral-text-muted)',
-                      fontWeight: '700',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                    }}>
-                      <div>#</div>
-                      <div>Task</div>
-                      <div>Assignee</div>
-                      <div>Status</div>
-                      <div>Priority</div>
-                      <div>Deadline</div>
-                    </div>
-                    {actionItems.map((ai, i) => {
-                      const who = ai.person || ai.assignee || 'TBD';
-                      const color = hashColor(who);
-                      return (
-                        <div key={i} style={{
-                          display: 'grid',
-                          gridTemplateColumns: '40px 2.5fr 1.25fr 1fr 0.75fr 1fr',
-                          gap: '1rem',
-                          padding: '1rem 0',
-                          borderBottom: '1px solid var(--border)',
-                          alignItems: 'start',
-                        }}>
-                          <div style={{ fontWeight: '600', color: 'var(--neutral-text-muted)' }}>{i + 1}</div>
-                          <div>
-                            <div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>{ai.task}</div>
-                            {ai.notes && <div style={{ fontSize: '0.8rem', color: 'var(--neutral-text-muted)' }}>{ai.notes}</div>}
-                          </div>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <div style={{
-                                width: '24px', height: '24px', borderRadius: '50%',
-                                background: color, color: 'white',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontWeight: '700', fontSize: '0.7rem',
-                              }}>{who.charAt(0).toUpperCase()}</div>
-                              <div style={{ fontWeight: '600' }}>{who}</div>
-                            </div>
-                          </div>
-                          <div><StatusBadge status={ai.status || 'Assigned'} /></div>
-                          <div>
-                            <span className={`badge ${(ai.priority || 'medium').toLowerCase() === 'high' ? 'high' : (ai.priority || 'medium').toLowerCase() === 'medium' ? 'med' : 'low'}`}>
-                              {ai.priority || 'Medium'}
-                            </span>
-                          </div>
-                          <div style={{ color: 'var(--neutral-text-muted)', fontSize: '0.9rem' }}>{ai.deadline || 'Not specified'}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p>No action items extracted.</p>
-                )}
-              </div>
-            )}
+
           </div>
         </div>
 
         <div>
-          <div className="card" style={{ marginBottom: '1.5rem' }}>
-            <h4 style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--neutral-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '1rem' }}>Meeting Stats</h4>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-              <span style={{ color: 'var(--neutral-text-muted)', fontSize: '0.875rem' }}>Duration</span>
-              <span style={{ fontWeight: '600' }}>{meeting.mom_data?.duration_minutes || meeting.word_count ? `${Math.round((meeting.word_count || 2250) / 150)}m` : 'Not recorded'}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-              <span style={{ color: 'var(--neutral-text-muted)', fontSize: '0.875rem' }}>Participants</span>
-              <span style={{ fontWeight: '600' }}>{participants.length}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-              <span style={{ color: 'var(--neutral-text-muted)', fontSize: '0.875rem' }}>Action Items</span>
-              <span style={{ fontWeight: '600' }}>{actionItems.length}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', alignItems: 'center' }}>
-              <span style={{ color: 'var(--neutral-text-muted)' }}>Club</span>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                {!editingClub ? (
-                  <>
-                    <span style={{ fontWeight: '600', color: 'var(--primary)' }}>{meeting.club_name}</span>
-                    <button className="btn-secondary" onClick={() => setEditingClub(true)} style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}>Edit</button>
-                  </>
-                ) : (
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <input value={clubEditValue} onChange={e => setClubEditValue(e.target.value)} style={{ padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }} />
-                    <button className="btn-primary" onClick={saveClubToProfile} style={{ padding: '0.25rem 0.6rem' }}>Save</button>
-                    <button className="btn-secondary" onClick={() => { setEditingClub(false); setClubEditValue(meeting.club_name); }} style={{ padding: '0.25rem 0.5rem' }}>Cancel</button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+
 
           <div className="card">
             <h4 style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--neutral-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '1rem' }}>Participants</h4>

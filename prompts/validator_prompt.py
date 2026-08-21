@@ -11,23 +11,31 @@ ORIGINAL TRANSCRIPT (for reference):
 EXTRACTED ACTION ITEMS:
 {action_items}
 
-VALIDATION RULES:
-1. **Task Clarity**: The task description must be specific and actionable, not vague.
-   - BAD: "Do stuff for the event"
-   - GOOD: "Book the auditorium for the annual fest on September 15th"
+VALIDATION RULES (Apply these sequentially to every action item):
+1. **Is task specific?**
+   - BAD: "Work on event"
+   - GOOD: "Finalize event poster"
+   - Flag as error if the task is too vague or lacks a clear action.
 
-2. **Assignee**: If an assignee is explicitly named, ensure it is their name. If no one is explicitly named in the transcript, "TBD" is fully acceptable and should NOT be flagged as an error.
+2. **Is owner explicitly supported?**
+   - Ensure the owner is explicitly named in the transcript or logically inferred from context. 
+   - If not supported by the transcript, it should be "TBD". Do not flag "TBD" as an error.
 
-3. **Deadline**: Must be specific. "Soon" or "ASAP" are NOT acceptable.
-   - Flag if deadline is missing, too vague, or impossible to infer.
+3. **Is deadline supported?**
+   - Ensure the deadline is supported by the text. "Soon" or "ASAP" should be flagged unless explicitly said.
 
-4. **Priority**: Must be one of: Low, Medium, High.
+4. **Is priority supported?**
+   - Ensure priority is one of: Low, Medium, High.
 
-5. **Completeness**: No critical information should be missing that was clearly stated in the transcript.
+5. **Does evidence exist?**
+   - Check the `evidence` field. Does it actually justify the task and owner based on the transcript? If it's missing or irrelevant, flag it.
+
+6. **No hallucinated information?**
+   - Verify that no details (dates, names, tasks) were completely invented by the extractor. If it's not in the transcript, flag it as hallucinated.
 
 For each issue found, provide:
 - item_index: The 0-based index of the problematic action item
-- field: The field with the issue (task, assignee, deadline, priority, notes)
+- field: The field with the issue (task, owner, deadline, priority, notes, evidence)
 - issue: Clear description of the problem
 - suggestion: How to fix it based on transcript context
 

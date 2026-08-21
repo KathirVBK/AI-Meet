@@ -20,6 +20,7 @@ def create_meeting_documents(
     club_name: str,
     meeting_date: str,
     meeting_title: Optional[str] = None,
+    decisions: Optional[List[dict]] = None,
 ) -> List[Document]:
     """
     Create LangChain Document chunks from meeting transcript and MoM text.
@@ -30,6 +31,7 @@ def create_meeting_documents(
         club_name: Name of the student club.
         meeting_date: Date of the meeting.
         meeting_title: Optional title for the meeting.
+        decisions: Optional list of structured decision dicts.
 
     Returns:
         List of Document chunks with metadata.
@@ -71,6 +73,29 @@ def create_meeting_documents(
                     "meeting_title": meeting_title or f"{club_name} Meeting",
                     "chunk_index": i,
                     "total_chunks": len(mom_chunks),
+                },
+            ))
+
+    # Process Decisions
+    if decisions:
+        for i, d in enumerate(decisions):
+            if isinstance(d, dict):
+                decision_text = d.get("decision", "")
+                status = d.get("status", "Confirmed")
+                content = f"Decision made: {decision_text}. Status: {status}."
+                if d.get("evidence"):
+                    content += f" Evidence: {d['evidence']}"
+            else:
+                content = f"Decision made: {d}"
+
+            documents.append(Document(
+                page_content=content,
+                metadata={
+                    "source": "decision",
+                    "club_name": club_name,
+                    "meeting_date": meeting_date,
+                    "meeting_title": meeting_title or f"{club_name} Meeting",
+                    "decision_index": i,
                 },
             ))
 

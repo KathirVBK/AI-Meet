@@ -316,9 +316,18 @@ def build_llm_context_transcript(
     lines = []
     for seg in reconstructed.segments:
         who = seg.speaker_name if use_names else seg.speaker_label
-        header = who
+        
         if include_timestamps:
-            header += f" [{seg.start_time:.1f}s - {seg.end_time:.1f}s]"
+            import math
+            total_secs = int(math.floor(seg.start_time))
+            hours = total_secs // 3600
+            minutes = (total_secs % 3600) // 60
+            seconds = total_secs % 60
+            ts_str = f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
+            header = f"{ts_str} {who}"
+        else:
+            header = who
+            
         lines.append(f"{header}:")
         lines.append(seg.text.strip())
         lines.append("")

@@ -27,10 +27,11 @@ EXTRACTOR_MODEL = os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-120b")
 # We ensure these are always set so that downstream consumers never see missing keys.
 _DEFAULT_ACTION_ITEM_KEYS = {
     "task": "",
-    "assignee": "TBD",
+    "owner": "TBD",
     "deadline": "Not specified",
     "priority": "Medium",
     "status": "Assigned",
+    "evidence": "Not provided",
     "source_speaker": None,
     "notes": None,
 }
@@ -136,7 +137,11 @@ def action_extractor_node(state: Dict[str, Any]) -> Dict[str, Any]:
     time.sleep(15)
     try:
         transcript_plain = state.get("transcript", "")
-        analysis = state.get("analysis", "")
+        analysis = state.get("analysis", {})
+        if isinstance(analysis, dict):
+            analysis_str = json.dumps(analysis, indent=2)
+        else:
+            analysis_str = str(analysis)
         labelled_transcript = state.get("labelled_transcript") or ""
         participants = state.get("participants") or []
         speaker_mapping = state.get("speaker_mapping") or {}
@@ -172,7 +177,7 @@ def action_extractor_node(state: Dict[str, Any]) -> Dict[str, Any]:
         chain = prompt | get_llm() | StrOutputParser()
         response = chain.invoke({
             "transcript": transcript_plain,
-            "analysis": analysis,
+            "analysis": analysis_str,
             "labelled_transcript": labelled_transcript,
             "participants": _format_participants(participants),
             "speaker_mapping": _format_mapping(speaker_mapping),
@@ -183,7 +188,7 @@ def action_extractor_node(state: Dict[str, Any]) -> Dict[str, Any]:
         logger.info("Extracted %d action items.", len(action_items))
         for i, ai in enumerate(action_items):
             logger.info("  [%d] %s | %s | %s | %s",
-                        i, ai.get("status", "?"), ai.get("assignee", "?"),
+                        i, ai.get("status", "?"), ai.get("owner", "?"),
                         ai.get("priority", "?"), (ai.get("task") or "")[:60])
 
         return {**state, "extracted_action_items": action_items, "error_message": None}

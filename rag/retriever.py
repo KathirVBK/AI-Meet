@@ -60,8 +60,10 @@ def format_retrieved_context(docs: List[Document]) -> str:
     for i, doc in enumerate(docs, 1):
         meta = doc.metadata
         source_label = "Meeting Minutes" if meta.get("source") == "minutes_of_meeting" else "Transcript"
+        title = meta.get("meeting_title") or meta.get("club_name", "Club")
+        date = meta.get("meeting_date", "N/A")
         context_parts.append(
-            f"[Source {i} — {source_label} | {meta.get('club_name', 'Club')} | {meta.get('meeting_date', 'N/A')}]\n"
+            f"[Source {i} — {source_label} | {title} | {date}]\n"
             f"{doc.page_content}"
         )
 

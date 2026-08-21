@@ -23,7 +23,7 @@ INSTRUCTIONS:
 3. Fix the flagged issues in the action items.
 4. Keep all non-flagged action items exactly as they are.
 5. If information truly cannot be inferred from the transcript, use reasonable defaults:
-   - For missing assignee: Use the most recently mentioned speaker or "Club Coordinator"
+   - For missing owner: Use the most recently mentioned speaker or "Club Coordinator"
    - For vague deadlines: Use "Before next meeting" if no specific date is mentioned
    - For unclear priority: Default to "Medium"
 
@@ -32,9 +32,11 @@ Return the COMPLETE corrected list of action items as a valid JSON array:
 [
   {{
     "task": "Description of task",
-    "assignee": "Person name",
+    "owner": "Person name",
     "deadline": "Deadline string",
     "priority": "High|Medium|Low",
+    "status": "Assigned|Accepted|Pending|TBD",
+    "evidence": "Transcript snippet or reasoning",
     "notes": "Optional notes or null"
   }}
 ]

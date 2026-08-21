@@ -25,7 +25,7 @@ class GraphState(TypedDict, total=False):
     meeting_date: str
 
     # Intermediate processing fields
-    analysis: str
+    analysis: dict
     extracted_action_items: List[dict]
     validation_errors: List[dict]
     validation_attempts: int

@@ -3,6 +3,7 @@ Meeting Analyzer Agent Node.
 Analyzes the meeting transcript to extract structure, attendees, agenda, and decisions.
 """
 import os
+import json
 import logging
 from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
@@ -51,14 +52,29 @@ def meeting_analyzer_node(state: dict) -> dict:
             input_variables=["transcript", "club_name", "meeting_date"],
         )
         chain = prompt | get_llm() | StrOutputParser()
-        analysis = chain.invoke({
+        response = chain.invoke({
             "transcript": transcript,
             "club_name": club_name,
             "meeting_date": meeting_date,
         })
-        analysis = clean_thinking(analysis)
+        response = clean_thinking(response)
+        
+        # Parse JSON
+        response = response.strip()
+        if response.startswith("```"):
+            lines = response.split("\n")
+            if lines and lines[-1].strip() == "```":
+                response = "\n".join(lines[1:-1])
+            else:
+                response = "\n".join(lines[1:])
+        
+        try:
+            analysis = json.loads(response)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse analyzer JSON: {e}. Raw: {response}")
+            analysis = {}
 
-        logger.info(f"Analysis complete. Output length: {len(analysis)} chars")
+        logger.info(f"Analysis complete. Output keys: {list(analysis.keys())}")
         return {**state, "analysis": analysis, "error_message": None}
 
     except Exception as e:

@@ -1,0 +1,24 @@
+{
+  "meeting_id": "test_meeting_001",
+  "club_name": "Tech Club",
+  "meeting_date": "21 August 2026",
+  "transcript": "Rahul: Let's start the meeting. We need to finalize the venue for the symposium.\nAnjali: I checked with the admin, the auditorium is available.\nRahul: Great, let's confirm the auditorium. Also, the event poster needs to be ready. Anjali, can you handle the poster by this Friday?\nAnjali: Sure, I will get the poster done by Friday.\nRahul: Thanks. The sponsorship team needs to start contacting companies. Let's say by next Monday.",
+  "ground_truth": {
+    "summary": "The team confirmed the auditorium as the venue for the upcoming symposium. Anjali agreed to design the event poster by Friday, and the sponsorship team is expected to begin outreach by next Monday.",
+    "decisions": [
+      "Confirm the auditorium as the venue for the symposium"
+    ],
+    "action_items": [
+      {
+        "task": "Design event poster",
+        "owner": "Anjali",
+        "deadline": "Friday"
+      },
+      {
+        "task": "Start contacting companies for sponsorship",
+        "owner": "TBD",
+        "deadline": "Next Monday"
+      }
+    ]
+  }
+}

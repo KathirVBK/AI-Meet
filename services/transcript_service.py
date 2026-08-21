@@ -330,7 +330,7 @@ def process_audio_full_pipeline(
     )
 
     labelled_text = build_llm_context_transcript(
-        final_reconstructed, use_names=True, include_timestamps=False,
+        final_reconstructed, use_names=True, include_timestamps=True,
     )
     plain_text = clean_transcript(final_reconstructed.raw_text or raw_text)
 

@@ -281,81 +281,116 @@ export default function ActionItems() {
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ width: '100%' }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '3fr 1.1fr 1fr 0.85fr 1.1fr 1.25fr',
-            gap: '1rem',
-            padding: '1rem 1.5rem',
-            background: 'var(--neutral-bg)',
-            borderBottom: '1px solid var(--border)',
-            fontSize: '0.75rem',
-            color: 'var(--neutral-text-muted)',
-            fontWeight: '700',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-          }}>
-            <div>Task</div>
-            <div>Assignee</div>
-            <div>Due Date</div>
-            <div>Priority</div>
-            <div>Resolution</div>
-            <div>Execution Status</div>
-          </div>
+          {(() => {
+            const getDeadlineCategory = (deadlineStr) => {
+              if (!deadlineStr || deadlineStr.toLowerCase() === 'not specified') return 'UPCOMING';
+              const d = new Date(deadlineStr);
+              if (isNaN(d.getTime())) return 'UPCOMING';
+              const now = new Date();
+              now.setHours(0,0,0,0);
+              const diffTime = d.getTime() - now.getTime();
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              if (diffDays < 0) return 'OVERDUE';
+              if (diffDays <= 3) return 'DUE SOON';
+              return 'UPCOMING';
+            };
 
-          {filtered.map((t, i) => {
-            const who = t.person || t.assignee || 'TBD';
-            const color = hashColor(who);
-            return (
-              <div key={i} style={{
-                display: 'grid',
-                gridTemplateColumns: '3fr 1.1fr 1fr 0.85fr 1.1fr 1.25fr',
-                gap: '1rem',
-                padding: '1.25rem 1.5rem',
-                borderBottom: '1px solid var(--border)',
-                alignItems: 'center',
-              }}>
-                <div>
-                  <div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>{t.task}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--neutral-text-muted)' }}>
-                    {t.club} • {t.meetingTitle} • {t.meetingDate || ''}
-                    {t.notes && <span> — {t.notes}</span>}
+            const groups = { 'OVERDUE': [], 'DUE SOON': [], 'UPCOMING': [] };
+            filtered.forEach(t => {
+              groups[getDeadlineCategory(t.deadline)].push(t);
+            });
+
+            return ['OVERDUE', 'DUE SOON', 'UPCOMING'].map(cat => {
+              const items = groups[cat];
+              if (items.length === 0) return null;
+              const icon = cat === 'OVERDUE' ? '🔴' : cat === 'DUE SOON' ? '🟠' : '🟢';
+
+              return (
+                <div key={cat} style={{ marginBottom: '2rem' }}>
+                  <div style={{ padding: '1.5rem 1.5rem 0.5rem 1.5rem' }}>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--neutral-text-muted)', letterSpacing: '0.05em' }}>
+                      {cat} {icon}
+                    </h4>
                   </div>
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{
-                      width: '26px', height: '26px', borderRadius: '50%',
-                      background: color, color: 'white',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: '700', fontSize: '0.7rem',
-                    }}>{who.charAt(0).toUpperCase()}</div>
-                    <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{who}</span>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '3fr 1.1fr 1fr 0.85fr 1.1fr 1.25fr',
+                    gap: '1rem',
+                    padding: '1rem 1.5rem',
+                    background: 'var(--neutral-bg)',
+                    borderBottom: '1px solid var(--border)',
+                    fontSize: '0.75rem',
+                    color: 'var(--neutral-text-muted)',
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                  }}>
+                    <div>Task</div>
+                    <div>Assignee</div>
+                    <div>Due Date</div>
+                    <div>Priority</div>
+                    <div>Resolution</div>
+                    <div>Execution Status</div>
                   </div>
+
+                  {items.map((t, i) => {
+                    const who = t.person || t.assignee || 'TBD';
+                    const color = hashColor(who);
+                    return (
+                      <div key={i} style={{
+                        display: 'grid',
+                        gridTemplateColumns: '3fr 1.1fr 1fr 0.85fr 1.1fr 1.25fr',
+                        gap: '1rem',
+                        padding: '1.25rem 1.5rem',
+                        borderBottom: '1px solid var(--border)',
+                        alignItems: 'center',
+                      }}>
+                        <div>
+                          <div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>{t.task}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--neutral-text-muted)' }}>
+                            {t.club} • {t.meetingTitle} • {t.meetingDate || ''}
+                            {t.notes && <span> — {t.notes}</span>}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{
+                              width: '26px', height: '26px', borderRadius: '50%',
+                              background: color, color: 'white',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontWeight: '700', fontSize: '0.7rem',
+                            }}>{who.charAt(0).toUpperCase()}</div>
+                            <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{who}</span>
+                          </div>
+                        </div>
+                        <div style={{ color: 'var(--neutral-text-muted)', fontSize: '0.9rem' }}>{t.deadline || 'Not specified'}</div>
+                        <div>
+                          <span className={`badge ${(t.priority || 'medium').toLowerCase() === 'high' ? 'high' : (t.priority || 'medium').toLowerCase() === 'medium' ? 'med' : 'low'}`}>
+                            {t.priority || 'Medium'}
+                          </span>
+                        </div>
+                        <div>
+                          <StatusBadge status={t.status || 'Assigned'} />
+                        </div>
+                        <div>
+                          <select
+                            value={t.status || 'Assigned'}
+                            onChange={e => handleStatusChange(t, e.target.value)}
+                            style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.85rem', background: 'white', width: '100%' }}
+                          >
+                            <option value="Assigned">Assigned</option>
+                            <option value="Accepted">Accepted</option>
+                            <option value="Pending">Pending</option>
+                            <option value="TBD">TBD</option>
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div style={{ color: 'var(--neutral-text-muted)', fontSize: '0.9rem' }}>{t.deadline || 'Not specified'}</div>
-                <div>
-                  <span className={`badge ${(t.priority || 'medium').toLowerCase() === 'high' ? 'high' : (t.priority || 'medium').toLowerCase() === 'medium' ? 'med' : 'low'}`}>
-                    {t.priority || 'Medium'}
-                  </span>
-                </div>
-                <div>
-                  <StatusBadge status={t.status || 'Assigned'} />
-                </div>
-                <div>
-                  <select
-                    value={t.status || 'Assigned'}
-                    onChange={e => handleStatusChange(t, e.target.value)}
-                    style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.85rem', background: 'white', width: '100%' }}
-                  >
-                    <option value="Assigned">Assigned</option>
-                    <option value="Accepted">Accepted</option>
-                    <option value="Pending">Pending</option>
-                    <option value="TBD">TBD</option>
-                  </select>
-                </div>
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
 
           {filtered.length === 0 && (
             <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--neutral-text-muted)' }}>

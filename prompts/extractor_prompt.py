@@ -36,16 +36,16 @@ MEETING ANALYSIS:
 TASK ASSIGNMENT RULES — FOLLOW THESE STRICTLY
 ═══════════════════════════════════════════════════════════════
 
-RULE 1 — EXPLICIT NAMING  →  status = "Assigned", assignee = the named person
+RULE 1 — EXPLICIT NAMING  →  status = "Assigned", owner = the named person
 If someone mentions a task and explicitly STATES WHO should do it (e.g. "Kathir will handle the poster"), assign it to that person and set status to "Assigned".
 
 Example:
   Speaker 2:
   Kathir will handle the poster.
-  → Extract: assignee = "Kathir", status = "Assigned", task = "Handle poster"
+  → Extract: owner = "Kathir", status = "Assigned", task = "Handle poster"
 
 RULE 2 — UNKNOWN OWNER
-If the task is mentioned but no specific person is named in the transcript text, set assignee = "TBD" and status = "TBD". Do not guess or infer the assignee if they are not explicitly named in the text.
+If the task is mentioned but no specific person is named in the transcript text, set owner = "TBD" and status = "TBD". Do not guess or infer the owner if they are not explicitly named in the text.
 
 ═══════════════════════════════════════════════════════════════
 EXTRACTION INSTRUCTIONS
@@ -54,10 +54,11 @@ EXTRACTION INSTRUCTIONS
 1. Identify EVERY task, follow-up, or responsibility mentioned.
 2. For each action item extract these fields:
    - **task**: Clear, specific description of what needs to be done
-   - **assignee**: The person responsible (participant name or "TBD")
+   - **owner**: The person responsible (participant name or "TBD")
    - **deadline**: Specific date or relative timeframe ("Not specified" as last resort)
    - **priority**: "High" (urgent/critical), "Medium" (important), or "Low" (nice to have)
    - **status**: One of "Assigned", "Accepted", "Pending", "TBD" — strictly based on rules 1-4 above
+   - **evidence**: Provide a short transcript snippet or a brief explanation of how you determined the task and owner
    - **source_speaker**: (OPTIONAL) the name/label of the speaker from whose turn the task was extracted
    - **notes**: (OPTIONAL) any extra context, or null
 
@@ -75,10 +76,11 @@ Return ONLY a valid JSON array of action item objects. Use exactly this schema:
 [
   {{
     "task": "Description of task",
-    "assignee": "Person name or TBD",
+    "owner": "Person name or TBD",
     "deadline": "Deadline string",
     "priority": "High|Medium|Low",
     "status": "Assigned|Accepted|Pending|TBD",
+    "evidence": "Transcript snippet or reasoning",
     "source_speaker": "Optional speaker name or null",
     "notes": "Optional notes or null"
   }}

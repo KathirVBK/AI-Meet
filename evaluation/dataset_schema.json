@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "meeting_id": {
+      "type": "string"
+    },
+    "club_name": {
+      "type": "string"
+    },
+    "meeting_date": {
+      "type": "string"
+    },
+    "transcript": {
+      "type": "string",
+      "description": "The raw transcript to run the pipeline on."
+    },
+    "ground_truth": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "action_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "task": { "type": "string" },
+              "owner": { "type": "string" },
+              "deadline": { "type": "string" }
+            },
+            "required": ["task"]
+          }
+        }
+      },
+      "required": ["summary", "decisions", "action_items"]
+    }
+  },
+  "required": ["meeting_id", "transcript", "ground_truth"]
+}

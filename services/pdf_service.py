@@ -46,14 +46,6 @@ def _priority_color(priority: str) -> colors.HexColor:
 def generate_mom_pdf(mom_data: dict, output_dir: str = "./output") -> bytes:
     """
     Generate a premium PDF from meeting minutes data.
-
-    Args:
-        mom_data: Dictionary with MoM fields (title, club_name, date, attendees,
-                  agenda_items, key_discussions, decisions, action_items, summary, next_meeting).
-        output_dir: Directory to save the PDF file.
-
-    Returns:
-        PDF file as bytes (for Streamlit download).
     """
     os.makedirs(output_dir, exist_ok=True)
 
@@ -71,33 +63,44 @@ def generate_mom_pdf(mom_data: dict, output_dir: str = "./output") -> bytes:
     styles = getSampleStyleSheet()
 
     # ── Custom styles ────────────────────────────────────────────────────────
+    meetmind_style = ParagraphStyle(
+        "MeetMindStyle",
+        parent=styles["Title"],
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        textColor=SLATE_900,
+        alignment=TA_CENTER,
+        spaceAfter=6,
+        letterSpacing=2,
+    )
     title_style = ParagraphStyle(
         "TitleStyle",
         parent=styles["Title"],
         fontName="Helvetica-Bold",
-        fontSize=22,
-        textColor=WHITE,
+        fontSize=14,
+        textColor=SLATE_700,
         alignment=TA_CENTER,
-        spaceAfter=4,
+        spaceAfter=16,
+        letterSpacing=1,
     )
-    subtitle_style = ParagraphStyle(
-        "SubtitleStyle",
+    meta_style = ParagraphStyle(
+        "MetaStyle",
         parent=styles["Normal"],
         fontName="Helvetica",
         fontSize=11,
-        textColor=SLATE_200,
-        alignment=TA_CENTER,
-        spaceAfter=2,
+        textColor=SLATE_700,
+        alignment=TA_LEFT,
+        spaceAfter=4,
     )
     section_style = ParagraphStyle(
         "SectionStyle",
         parent=styles["Heading2"],
         fontName="Helvetica-Bold",
-        fontSize=13,
-        textColor=INDIGO,
-        spaceBefore=14,
-        spaceAfter=6,
-        borderPad=0,
+        fontSize=12,
+        textColor=SLATE_900,
+        spaceBefore=16,
+        spaceAfter=8,
+        letterSpacing=1,
     )
     body_style = ParagraphStyle(
         "BodyStyle",
@@ -113,114 +116,86 @@ def generate_mom_pdf(mom_data: dict, output_dir: str = "./output") -> bytes:
         parent=body_style,
         leftIndent=16,
         bulletIndent=4,
-        spaceAfter=3,
+        spaceAfter=4,
     )
     footer_style = ParagraphStyle(
         "FooterStyle",
         parent=styles["Normal"],
         fontName="Helvetica-Oblique",
-        fontSize=8,
+        fontSize=9,
         textColor=SLATE_700,
         alignment=TA_CENTER,
     )
 
     story = []
+    
+    # ── Top Line ─────────────────────────────────────────────────────────────
+    story.append(HRFlowable(width="100%", thickness=1, color=SLATE_900, spaceAfter=14))
 
-    # ── Header Banner ────────────────────────────────────────────────────────
-    header_data = [
-        [
-            Paragraph(f"Minutes of Meeting", title_style),
-        ],
-        [
-            Paragraph(mom_data.get("club_name", "Student Club"), subtitle_style),
-        ],
-        [
-            Paragraph(f"Date: {mom_data.get('date', 'N/A')}  |  Venue: {mom_data.get('venue', 'N/A')}", subtitle_style),
-        ],
-    ]
-    header_table = Table(header_data, colWidths=[17 * cm])
-    header_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), INDIGO),
-        ("ROUNDEDCORNERS", [8]),
-        ("TOPPADDING", (0, 0), (-1, -1), 14),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
-        ("LEFTPADDING", (0, 0), (-1, -1), 20),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 20),
-    ]))
-    story.append(header_table)
-    story.append(Spacer(1, 0.5 * cm))
+    # ── Header ───────────────────────────────────────────────────────────────
+    story.append(Paragraph("MEETMIND", meetmind_style))
+    story.append(Paragraph("MINUTES OF MEETING", title_style))
+    
+    meeting_title = mom_data.get("meeting_title") or mom_data.get("title") or f"{mom_data.get('club_name', 'Student Club')} Meeting"
+    story.append(Paragraph(f"<b>Meeting:</b> {meeting_title}", meta_style))
+    story.append(Paragraph(f"<b>Date:</b> {mom_data.get('date', 'N/A')}", meta_style))
+    
+    # Duration (calculate from word_count if duration_minutes not present)
+    dur = mom_data.get("duration_minutes")
+    if dur is None:
+        word_count = mom_data.get("word_count", 2250)
+        dur = max(1, round(word_count / 150))
+    story.append(Paragraph(f"<b>Duration:</b> {dur} minutes", meta_style))
+    
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", thickness=1, color=SLATE_900, spaceAfter=14))
 
-    def add_section(title: str, content_fn):
-        story.append(Paragraph(title, section_style))
-        story.append(HRFlowable(width="100%", thickness=1, color=SLATE_200, spaceAfter=6))
-        content_fn()
-        story.append(Spacer(1, 0.3 * cm))
-
-    # ── Attendees ────────────────────────────────────────────────────────────
-    def attendees_content():
-        attendees = mom_data.get("attendees", [])
-        if attendees:
-            cols = 3
-            rows = [attendees[i:i+cols] for i in range(0, len(attendees), cols)]
-            padded = [r + [""] * (cols - len(r)) for r in rows]
-            t = Table(padded, colWidths=[5.5 * cm] * cols)
-            t.setStyle(TableStyle([
-                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 10),
-                ("TEXTCOLOR", (0, 0), (-1, -1), SLATE_900),
-                ("ROWBACKGROUNDS", (0, 0), (-1, -1), [SLATE_50, WHITE]),
-                ("GRID", (0, 0), (-1, -1), 0.5, SLATE_200),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-                ("LEFTPADDING", (0, 0), (-1, -1), 8),
-            ]))
-            story.append(t)
-        else:
-            story.append(Paragraph("No attendees listed.", body_style))
-
-        add_section("Attendees", attendees_content)
-
-    # ── Agenda ───────────────────────────────────────────────────────────────
-    def agenda_content():
-        for i, item in enumerate(mom_data.get("agenda_items", []), 1):
-            story.append(Paragraph(f"{i}. {item}", bullet_style))
-
-        add_section("Agenda", agenda_content)
+    # ── Summary ──────────────────────────────────────────────────────────────
+    summary_text = mom_data.get("summary") or mom_data.get("executive_summary")
+    if summary_text:
+        story.append(Paragraph("SUMMARY", section_style))
+        story.append(Paragraph(summary_text, body_style))
+        story.append(Spacer(1, 8))
 
     # ── Key Discussions ──────────────────────────────────────────────────────
-    def discussions_content():
-        for point in mom_data.get("key_discussions", []):
+    discussions = mom_data.get("key_discussions") or mom_data.get("discussion_points") or []
+    if discussions:
+        story.append(Paragraph("KEY DISCUSSIONS", section_style))
+        for point in discussions:
             story.append(Paragraph(f"• {point}", bullet_style))
-
-        add_section("Key Discussions", discussions_content)
+        story.append(Spacer(1, 8))
 
     # ── Decisions ────────────────────────────────────────────────────────────
-    def decisions_content():
-        for decision in mom_data.get("decisions", []):
-            story.append(Paragraph(f"✓  {decision}", bullet_style))
+    decisions = mom_data.get("decisions", [])
+    if decisions:
+        story.append(Paragraph("DECISIONS", section_style))
+        for d in decisions:
+            if isinstance(d, dict):
+                decision_text = d.get('decision', '')
+                status = d.get('status', 'Confirmed')
+                story.append(Paragraph(f"• <b>{decision_text}</b> (Status: {status})", bullet_style))
+            else:
+                story.append(Paragraph(f"• {d}", bullet_style))
+        story.append(Spacer(1, 8))
 
-    add_section("Decisions Made", decisions_content)
-
-    # ── Action Items Table ───────────────────────────────────────────────────
-    def action_items_content():
-        action_items = mom_data.get("action_items", [])
-        if not action_items:
-            story.append(Paragraph("No action items recorded.", body_style))
-            return
-
-        header = ["#", "Task", "Assignee", "Deadline", "Priority"]
+    # ── Action Plan ──────────────────────────────────────────────────────────
+    action_items = mom_data.get("action_items", [])
+    if action_items:
+        story.append(Paragraph("ACTION PLAN", section_style))
+        
+        header = ["Task", "Owner", "Deadline", "Priority"]
         header_row = [Paragraph(f"<b>{h}</b>", ParagraphStyle(
             "th", parent=body_style, textColor=WHITE, fontName="Helvetica-Bold", fontSize=9
         )) for h in header]
 
         rows = [header_row]
-        for i, item in enumerate(action_items, 1):
+        for item in action_items:
             priority = item.get("priority", "Medium")
             p_color = _priority_color(priority)
+            owner = item.get("owner") or item.get("person") or item.get("assignee") or "TBD"
             rows.append([
-                Paragraph(str(i), body_style),
                 Paragraph(item.get("task", ""), body_style),
-                Paragraph(item.get("assignee", "TBD"), body_style),
+                Paragraph(owner, body_style),
                 Paragraph(item.get("deadline", "N/A"), body_style),
                 Paragraph(
                     f"<font color='#{p_color.hexval()[2:]}'><b>{priority}</b></font>",
@@ -228,10 +203,10 @@ def generate_mom_pdf(mom_data: dict, output_dir: str = "./output") -> bytes:
                 ),
             ])
 
-        col_widths = [1 * cm, 7 * cm, 3 * cm, 3.5 * cm, 2 * cm]
+        col_widths = [7.5 * cm, 3 * cm, 3.5 * cm, 2.5 * cm]
         t = Table(rows, colWidths=col_widths, repeatRows=1)
         t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), INDIGO_DARK),
+            ("BACKGROUND", (0, 0), (-1, 0), SLATE_900),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [SLATE_50, WHITE]),
             ("GRID", (0, 0), (-1, -1), 0.5, SLATE_200),
             ("TOPPADDING", (0, 0), (-1, -1), 6),
@@ -240,28 +215,12 @@ def generate_mom_pdf(mom_data: dict, output_dir: str = "./output") -> bytes:
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ]))
         story.append(t)
-
-    add_section("Action Items", action_items_content)
-
-    # ── Executive Summary ────────────────────────────────────────────────────
-    def summary_content():
-        story.append(Paragraph(mom_data.get("summary", ""), body_style))
-
-    add_section("📝  Executive Summary", summary_content)
-
-    # ── Next Meeting ─────────────────────────────────────────────────────────
-    def next_meeting_content():
-        next_mtg = mom_data.get("next_meeting") or "To be scheduled"
-        story.append(Paragraph(next_mtg, body_style))
-
-    add_section("📅  Next Meeting", next_meeting_content)
+        story.append(Spacer(1, 14))
 
     # ── Footer ───────────────────────────────────────────────────────────────
-    story.append(Spacer(1, 0.5 * cm))
-    story.append(HRFlowable(width="100%", thickness=1, color=SLATE_200))
-    story.append(Spacer(1, 0.2 * cm))
+    story.append(HRFlowable(width="100%", thickness=1, color=SLATE_900, spaceAfter=14))
     story.append(Paragraph(
-        f"Minutes compiled by AI Meeting Assistant  ·  Generated on {datetime.now().strftime('%B %d, %Y at %H:%M')}",
+        "Generated by MeetMind AI",
         footer_style,
     ))
 

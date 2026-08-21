@@ -1,6 +1,6 @@
 import { Component, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Calendar, CheckSquare, LogOut } from 'lucide-react';
+import { BookOpen, LayoutDashboard, PlusCircle, Calendar, CheckSquare, LogOut } from 'lucide-react';
 import { API_BASE_URL } from './config';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -9,6 +9,7 @@ import NewMeeting from './pages/NewMeeting';
 import Archive from './pages/Archive';
 import MeetingDetails from './pages/MeetingDetails';
 import ActionItems from './pages/ActionItems';
+import Decisions from './pages/Decisions';
 import './index.css';
 
 class ErrorBoundary extends Component {
@@ -75,6 +76,9 @@ const Sidebar = () => {
         <Link to="/archive" className={`nav-item ${location.pathname === '/archive' ? 'active' : ''}`}>
           <Calendar size={20} /> Meetings
         </Link>
+        <Link to="/decisions" className={`nav-item ${location.pathname === '/decisions' ? 'active' : ''}`}>
+          <BookOpen size={20} /> Decisions
+        </Link>
         <Link to="/action-items" className={`nav-item ${location.pathname === '/action-items' ? 'active' : ''}`}>
           <CheckSquare size={20} /> Action Items
         </Link>
@@ -98,7 +102,7 @@ const Topbar = () => {
     }
   })();
   const [editing, setEditing] = useState(false);
-  const [clubValue, setClubValue] = useState(user?.club || '');
+  const [clubValue, setClubValue] = useState(user?.clubs && user.clubs.length > 0 ? user.clubs[0].club_name : '');
   const [saving, setSaving] = useState(false);
 
   const saveClub = async () => {
@@ -146,14 +150,16 @@ const Topbar = () => {
             <>
               <input value={clubValue} onChange={e => setClubValue(e.target.value)} style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--primary)', outline: 'none' }} />
               <button className="btn-primary" onClick={saveClub} disabled={saving} style={{ padding: '0.5rem 1rem' }}>{saving ? 'Saving...' : 'Save'}</button>
-              <button className="btn-secondary" onClick={() => { setEditing(false); setClubValue(user?.club || ''); }} style={{ padding: '0.5rem 1rem' }}>Cancel</button>
+              <button className="btn-secondary" onClick={() => { setEditing(false); setClubValue(user?.clubs && user.clubs.length > 0 ? user.clubs[0].club_name : ''); }} style={{ padding: '0.5rem 1rem' }}>Cancel</button>
             </>
           ) : (
             <>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '0.95rem', color: 'var(--neutral-text)' }}>{user?.name || 'User'}</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--primary)', cursor: 'pointer' }} onClick={() => setEditing(true)}>
-                  {user?.club || 'Add Club'} ✎
+                  {user?.clubs && user.clubs.length > 0 ? (
+                    user.clubs.length === 1 ? user.clubs[0].club_name : `${user.clubs[0].club_name} (+${user.clubs.length - 1})`
+                  ) : 'Add Club'} ✎
                 </div>
               </div>
               <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(99,102,241,0.3)' }}>
@@ -197,6 +203,7 @@ function App() {
         <Route path="/new-meeting" element={<ProtectedLayout><NewMeeting /></ProtectedLayout>} />
         <Route path="/archive" element={<ProtectedLayout><Archive /></ProtectedLayout>} />
         <Route path="/meeting/:id" element={<ProtectedLayout><MeetingDetails /></ProtectedLayout>} />
+        <Route path="/decisions" element={<ProtectedLayout><Decisions /></ProtectedLayout>} />
         <Route path="/action-items" element={<ProtectedLayout><ActionItems /></ProtectedLayout>} />
       </Routes>
     </BrowserRouter>

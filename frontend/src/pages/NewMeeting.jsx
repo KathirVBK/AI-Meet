@@ -25,7 +25,48 @@ export default function NewMeeting() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
   const token = localStorage.getItem('token');
+
+  const handleFileSelect = (selectedFile) => {
+    setError('');
+    if (!selectedFile) return;
+    
+    const validExtensions = ['.wav', '.mp3', '.m4a'];
+    const extension = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
+    
+    if (!validExtensions.includes(extension)) {
+      setError('Invalid file type. Please upload a WAV, MP3, or M4A file.');
+      setFile(null);
+      return;
+    }
+    
+    if (selectedFile.size > 200 * 1024 * 1024) {
+      setError('File is too large. Maximum size is 200 MB.');
+      setFile(null);
+      return;
+    }
+    
+    setFile(selectedFile);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileSelect(e.dataTransfer.files[0]);
+    }
+  };
 
   // Fetch clubs from /api/clubs so we can suggest existing org names
   useEffect(() => {
@@ -242,21 +283,28 @@ export default function NewMeeting() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <label
             htmlFor="audio-upload"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
             style={{
               flex: 1,
-              border: file ? '1px solid var(--primary)' : '2px dashed var(--border)',
+              border: isDragging ? '2px dashed var(--primary)' : (file ? '1px solid var(--primary)' : '2px dashed var(--border)'),
               borderRadius: '12px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              background: file ? 'rgba(79, 70, 229, 0.05)' : 'white',
+              background: isDragging ? 'rgba(79, 70, 229, 0.1)' : (file ? 'rgba(79, 70, 229, 0.05)' : 'white'),
               padding: '3rem 1.5rem',
               cursor: 'pointer',
               minHeight: '220px',
               textAlign: 'center',
+              transition: 'all 0.2s ease',
             }}
           >
+            <div style={{ fontWeight: '700', fontSize: '1.2rem', marginBottom: '1rem', color: 'var(--text-main)' }}>
+              Upload Meeting
+            </div>
             <div style={{ width: '48px', height: '48px', marginBottom: '1rem', borderRadius: '12px', background: 'rgba(79, 70, 229, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--primary)' }}>
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -265,12 +313,18 @@ export default function NewMeeting() {
               </svg>
             </div>
             <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>
-              {file ? file.name : 'Upload an audio file'}
+              {file ? file.name : 'Drag & Drop Audio File'}
             </div>
-            <div style={{ fontSize: '0.875rem', color: 'var(--neutral-text-muted)', marginBottom: '1.5rem' }}>
-              {file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB — click to replace` : 'MP3, WAV, or M4A (maximum 200 MB)'}
+            <div style={{ fontSize: '0.875rem', color: 'var(--neutral-text-muted)', marginBottom: '1.5rem', fontWeight: '500' }}>
+              {file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB — click to replace` : 'MP3 | WAV | M4A'}
             </div>
-            <input type="file" id="audio-upload" style={{ display: 'none' }} onChange={e => setFile(e.target.files[0])} accept="audio/*" />
+            <input 
+              type="file" 
+              id="audio-upload" 
+              style={{ display: 'none' }} 
+              onChange={e => handleFileSelect(e.target.files[0])} 
+              accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/x-m4a" 
+            />
             <span className="btn-secondary" style={{ cursor: 'pointer', pointerEvents: 'none' }}>
               Select File
             </span>
@@ -287,7 +341,7 @@ export default function NewMeeting() {
             style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
             disabled={loading}
           >
-            {loading ? 'Processing... (This may take a few minutes)' : 'Generate Minutes'}
+            {loading ? 'Processing... (This may take a few minutes)' : 'Process Meeting'}
           </button>
         </div>
       </div>

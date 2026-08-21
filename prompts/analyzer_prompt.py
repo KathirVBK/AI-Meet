@@ -11,37 +11,23 @@ TRANSCRIPT:
 CLUB NAME: {club_name}
 MEETING DATE: {meeting_date}
 
-Please provide a comprehensive analysis in the following structured format:
+Please provide a comprehensive analysis in the following strict JSON format. 
+Return ONLY the JSON object, with no markdown formatting outside of it, no code fences, and no conversational text.
 
-## MEETING OVERVIEW
-- **Title**: [Descriptive title for the meeting]
-- **Venue/Platform**: [Where the meeting took place, if mentioned]
-- **Attendees**: [Comma-separated list of all people mentioned or identified]
-- **Duration**: [Estimated or stated duration, if available]
+{{
+  "meeting_title": "Descriptive title for the meeting",
+  "date": "Date of the meeting",
+  "attendees": ["List", "of", "attendees"],
+  "agenda": ["Topic 1", "Topic 2"],
+  "discussion_points": ["Key discussion point 1", "Key discussion point 2"],
+  "decisions": [
+    {{
+      "decision": "Decision 1",
+      "status": "Confirmed",
+      "evidence": "Optional transcript snippet"
+    }}
+  ]
+}}
 
-## AGENDA ITEMS
-List all topics that were formally or informally discussed (numbered list):
-1. [Topic 1]
-2. [Topic 2]
-...
-
-## KEY DISCUSSIONS
-Summarize the main discussion points clearly:
-- [Discussion point 1]
-- [Discussion point 2]
-...
-
-## DECISIONS MADE
-List all decisions, resolutions, or agreements that were reached:
-- [Decision 1]
-- [Decision 2]
-...
-
-## NEXT MEETING
-[Details about the next meeting if mentioned, otherwise "Not mentioned"]
-
-## EXECUTIVE SUMMARY
-Write a concise 3-5 sentence summary of the overall meeting, its purpose, and outcomes.
-
-Be thorough, accurate, and ensure every important detail from the transcript is captured.
+Be thorough, accurate, and ensure every important detail from the transcript is captured in the JSON.
 """

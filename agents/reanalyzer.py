@@ -5,6 +5,7 @@ Fixes validation errors in extracted action items by re-reading the transcript.
 import os
 import json
 import logging
+import re
 from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
