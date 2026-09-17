@@ -61,7 +61,27 @@ export default function Archive() {
           const actionsCount = m.action_items?.length || 0;
           return (
             <div key={i} className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.25rem' }}>{m.mom_data?.title || m.club_name || 'Meeting Session'}</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--primary)', background: 'rgba(99, 102, 241, 0.08)', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
+                  {m.club_name}
+                </span>
+                {m.approval_status === 'PENDING_REVIEW' && (
+                  <span style={{ background: '#fef3c7', color: '#92400e', padding: '0.15rem 0.5rem', borderRadius: '99px', fontSize: '0.72rem', fontWeight: 'bold' }}>
+                    Pending Review
+                  </span>
+                )}
+                {m.approval_status === 'REJECTED' && (
+                  <span style={{ background: '#fee2e2', color: '#991b1b', padding: '0.15rem 0.5rem', borderRadius: '99px', fontSize: '0.72rem', fontWeight: 'bold' }}>
+                    Rejected
+                  </span>
+                )}
+                {m.approval_status === 'APPROVED' && (
+                  <span style={{ background: '#dcfce7', color: '#166534', padding: '0.15rem 0.5rem', borderRadius: '99px', fontSize: '0.72rem', fontWeight: 'bold' }}>
+                    Approved
+                  </span>
+                )}
+              </div>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.25rem' }}>{m.mom_data?.title || m.title || 'Meeting Session'}</h3>
               <div style={{ fontSize: '0.875rem', color: 'var(--neutral-text-muted)', marginBottom: '0.25rem' }}>
                 {m.meeting_date}
               </div>

@@ -14,7 +14,7 @@ from prompts.rag_prompt import RAG_PROMPT
 
 logger = logging.getLogger(__name__)
 
-RAG_LLM_MODEL = os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-120b")
+RAG_LLM_MODEL = os.getenv("GROQ_LLM_MODEL", "llama3-8b-8192")
 
 
 def get_rag_llm() -> ChatGroq:

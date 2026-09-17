@@ -25,11 +25,11 @@ export async function apiCall(endpoint, options = {}) {
   try {
     const url = `${API_BASE_URL}${endpoint}`;
     const response = await fetch(url, {
+      ...options,
       headers: {
         'Content-Type': 'application/json',
         ...options.headers
-      },
-      ...options
+      }
     });
 
     const contentType = response.headers.get('content-type');
@@ -44,7 +44,7 @@ export async function apiCall(endpoint, options = {}) {
         // Try to get error details from response
         if (isJsonContent(contentType)) {
           errorBody = await response.json();
-          errorMessage = errorBody.message || errorBody.error || errorMessage;
+          errorMessage = errorBody.message || errorBody.error || errorBody.detail || errorMessage;
         } else {
           // If not JSON, try to read as text
           const text = await response.text();

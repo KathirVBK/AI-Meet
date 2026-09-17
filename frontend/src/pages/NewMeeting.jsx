@@ -21,6 +21,8 @@ export default function NewMeeting() {
     numSpeakers: '',
   });
   const [knownClubs, setKnownClubs] = useState([]);
+  const [availableTemplates, setAvailableTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -87,6 +89,33 @@ export default function NewMeeting() {
     return () => controller.abort();
   }, [token]);
 
+  // Fetch agenda templates whenever club name changes
+  useEffect(() => {
+    if (!token || !formData.clubName.trim()) {
+      setAvailableTemplates([]);
+      setSelectedTemplateId('');
+      return;
+    }
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE_URL}/api/clubs/${encodeURIComponent(formData.clubName.trim())}/agenda-templates`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+        if (r.ok) {
+          const json = await r.json();
+          if (json.success && Array.isArray(json.templates)) {
+            setAvailableTemplates(json.templates);
+          } else {
+            setAvailableTemplates([]);
+          }
+        }
+      } catch { /* ignore non-critical */ }
+    })();
+    return () => controller.abort();
+  }, [token, formData.clubName]);
+
   const persistClubIfNeeded = async (clubName) => {
     if (!formData.saveClubToProfile) return;
     if (!token) return;
@@ -128,12 +157,15 @@ export default function NewMeeting() {
 
     const data = new FormData();
     data.append('audio', file);
-    data.append('date', formData.date);
+    data.append('meeting_date', formData.date);
     data.append('title', formData.title);
-    data.append('type', formData.type);
+    data.append('meeting_type', formData.type);
     data.append('club_name', formData.clubName.trim());
     if (formData.numSpeakers && !Number.isNaN(Number(formData.numSpeakers)) && Number(formData.numSpeakers) > 0) {
       data.append('num_speakers', String(Number(formData.numSpeakers)));
+    }
+    if (selectedTemplateId) {
+      data.append('agenda_template_id', selectedTemplateId);
     }
 
     try {
@@ -158,7 +190,7 @@ export default function NewMeeting() {
           setError('Session expired or unauthorized. Please log in again.');
           return;
         }
-        throw new Error(json.error || 'Processing failed');
+        throw new Error(json.error || json.detail || 'Processing failed');
       }
 
       if (json && json.id) {
@@ -258,6 +290,52 @@ export default function NewMeeting() {
               onChange={e => setFormData({ ...formData, title: e.target.value })}
               required
             />
+          </div>
+
+          {/* Agenda Template Selector */}
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+              <label htmlFor="agenda-template-select" style={{ margin: 0, fontWeight: '600', fontSize: '0.9rem' }}>
+                Standard Agenda Template (Optional)
+              </label>
+              {availableTemplates.length > 0 && (
+                <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '600' }}>
+                  {availableTemplates.length} {availableTemplates.length === 1 ? 'template' : 'templates'} available
+                </span>
+              )}
+            </div>
+            <select
+              id="agenda-template-select"
+              value={selectedTemplateId}
+              onChange={e => setSelectedTemplateId(e.target.value)}
+              style={{ width: '100%', padding: '0.65rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border)' }}
+            >
+              <option value="">None (Standard AI Agenda Extraction)</option>
+              {availableTemplates.map(t => (
+                <option key={t.id} value={t.id}>{t.title}</option>
+              ))}
+            </select>
+            {selectedTemplateId && (() => {
+              const activeTpl = availableTemplates.find(t => String(t.id) === String(selectedTemplateId));
+              if (!activeTpl) return null;
+              return (
+                <div style={{ marginTop: '0.6rem', padding: '0.75rem 1rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.2)', fontSize: '0.85rem' }}>
+                  <div style={{ fontWeight: '600', color: 'var(--primary)', marginBottom: '0.25rem' }}>
+                    📋 {activeTpl.title}
+                  </div>
+                  {activeTpl.description && <div style={{ color: 'var(--neutral-text-muted)', marginBottom: '0.4rem' }}>{activeTpl.description}</div>}
+                  {activeTpl.agenda_items?.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      {activeTpl.agenda_items.map((item, idx) => (
+                        <div key={idx} style={{ display: 'flex', gap: '0.4rem', color: 'var(--neutral-text)' }}>
+                          <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{idx + 1}.</span> {item}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
 

@@ -23,6 +23,8 @@ class GraphState(TypedDict, total=False):
     speaker_mapping: Dict[str, str]  # Speaker 1 -> Kathir
     club_name: str
     meeting_date: str
+    ai_persona: Optional[str]                  # Club-specific custom instructions/persona
+    agenda_items: Optional[List[str]]          # Expected agenda items from template
 
     # Intermediate processing fields
     analysis: dict

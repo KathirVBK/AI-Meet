@@ -1,6 +1,6 @@
 import { Component, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen, LayoutDashboard, PlusCircle, Calendar, CheckSquare, LogOut } from 'lucide-react';
+import { BookOpen, LayoutDashboard, PlusCircle, Calendar, CheckSquare, LogOut, Shield } from 'lucide-react';
 import { API_BASE_URL } from './config';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -10,6 +10,7 @@ import Archive from './pages/Archive';
 import MeetingDetails from './pages/MeetingDetails';
 import ActionItems from './pages/ActionItems';
 import Decisions from './pages/Decisions';
+import AdminPanel from './pages/AdminPanel';
 import './index.css';
 
 class ErrorBoundary extends Component {
@@ -60,6 +61,15 @@ const Sidebar = () => {
     navigate('/login');
   };
 
+  const user = (() => {
+    try {
+      const u = localStorage.getItem('user');
+      return u && u !== 'undefined' && u !== 'null' ? JSON.parse(u) : {};
+    } catch {
+      return {};
+    }
+  })();
+
   return (
     <div className="sidebar glass">
       <div className="sidebar-header">
@@ -82,6 +92,11 @@ const Sidebar = () => {
         <Link to="/action-items" className={`nav-item ${location.pathname === '/action-items' ? 'active' : ''}`}>
           <CheckSquare size={20} /> Action Items
         </Link>
+        {['SUPER_ADMIN', 'ADMIN'].includes(user?.global_role) && (
+          <Link to="/admin" className={`nav-item ${location.pathname === '/admin' ? 'active' : ''}`}>
+            <Shield size={20} /> Admin Panel
+          </Link>
+        )}
       </div>
       <div style={{ marginTop: 'auto', padding: '1.5rem' }}>
         <button className="nav-item" style={{ width: '100%', justifyContent: 'flex-start' }} onClick={handleLogout}>
@@ -192,6 +207,35 @@ const ProtectedLayout = ({ children }) => {
   );
 };
 
+const AdminRoute = ({ children }) => {
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" />;
+  }
+  try {
+    const u = localStorage.getItem('user');
+    const user = u ? JSON.parse(u) : {};
+    if (!['SUPER_ADMIN', 'ADMIN'].includes(user.global_role)) {
+      return <Navigate to="/" />;
+    }
+  } catch {
+    return <Navigate to="/" />;
+  }
+  
+  return (
+    <div className="app-container">
+      <Sidebar />
+      <div className="main-content">
+        <Topbar />
+        <div className="content-area">
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   return (
     <BrowserRouter>
@@ -205,6 +249,7 @@ function App() {
         <Route path="/meeting/:id" element={<ProtectedLayout><MeetingDetails /></ProtectedLayout>} />
         <Route path="/decisions" element={<ProtectedLayout><Decisions /></ProtectedLayout>} />
         <Route path="/action-items" element={<ProtectedLayout><ActionItems /></ProtectedLayout>} />
+        <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
       </Routes>
     </BrowserRouter>
   );

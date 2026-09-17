@@ -9,6 +9,7 @@ pydantic>=2.0.0
 reportlab>=4.0.0
 python-dotenv>=1.0.0
 pydub>=0.25.1
+audioop-lts>=0.2.2  # Required for Python 3.13+ (audioop removed from stdlib)
 huggingface_hub
 protobuf>=3.20.0
 torch>=2.0.0

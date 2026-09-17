@@ -30,7 +30,8 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     department = Column(String, nullable=True)
     year = Column(String, nullable=True)
-    global_role = Column(String, default="Student")  # Student | Admin
+    global_role = Column(String, default="STUDENT")  # Maps to Role.name
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -59,8 +60,9 @@ class Club(Base):
     __tablename__ = "clubs"
 
     id = Column(String, primary_key=True, default=_uuid)
-    name = Column(String, unique=True, nullable=False)
+    name = Column(String, unique=True, index=True, nullable=False)
     description = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     members = relationship("ClubMember", back_populates="club", cascade="all, delete-orphan")
@@ -104,10 +106,15 @@ class Meeting(Base):
     mom_data_json = Column(Text, nullable=True)  # JSON string for full MoM data
     speaker_mapping_json = Column(Text, nullable=True)
     transcript_segments_json = Column(Text, nullable=True)
+    approval_status = Column(String, default="APPROVED")  # APPROVED | PENDING_REVIEW | REJECTED
+    approval_notes = Column(Text, nullable=True)
+    approved_by = Column(String, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     creator = relationship("User", back_populates="created_meetings", foreign_keys=[created_by])
+    approver = relationship("User", foreign_keys=[approved_by])
     club = relationship("Club", back_populates="meetings")
     participants = relationship("MeetingParticipant", back_populates="meeting", cascade="all, delete-orphan")
     action_items = relationship("ActionItem", back_populates="meeting", cascade="all, delete-orphan")
@@ -144,6 +151,8 @@ class ActionItem(Base):
     status = Column(String, default="Assigned")  # Assigned | Accepted | Pending | TBD
     evidence = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
+    nudge_count = Column(Integer, default=0)
+    last_nudged_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     meeting = relationship("Meeting", back_populates="action_items")
@@ -163,3 +172,62 @@ class Decision(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     meeting = relationship("Meeting", back_populates="decisions")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROLE-BASED ACCESS CONTROL (RBAC)
+# ═══════════════════════════════════════════════════════════════════════════════
+class Role(Base):
+    __tablename__ = "roles"
+
+    name = Column(String, primary_key=True) # e.g. "SUPER_ADMIN", "STUDENT"
+    description = Column(String, nullable=True)
+    
+    # Relationships
+    permissions = relationship("RolePermission", back_populates="role", cascade="all, delete-orphan")
+
+
+class Permission(Base):
+    __tablename__ = "permissions"
+
+    name = Column(String, primary_key=True) # e.g. "users.view", "meetings.delete"
+    description = Column(String, nullable=True)
+
+
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    role_name = Column(String, ForeignKey("roles.name", ondelete="CASCADE"), nullable=False)
+    permission_name = Column(String, ForeignKey("permissions.name", ondelete="CASCADE"), nullable=False)
+
+    role = relationship("Role", back_populates="permissions")
+    permission = relationship("Permission")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AUDIT LOGS
+# ═══════════════════════════════════════════════════════════════════════════════
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True) # User who performed the action
+    user_email = Column(String, nullable=True) # Store email directly in case user is deleted
+    action = Column(String, nullable=False) # e.g., DELETED_MEETING, PROMOTED_USER
+    details = Column(Text, nullable=True) # JSON string with additional info
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SYSTEM SETTINGS
+# ═══════════════════════════════════════════════════════════════════════════════
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    key = Column(String, primary_key=True)
+    value = Column(Text, nullable=False) # JSON string
+    description = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

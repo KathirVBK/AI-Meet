@@ -77,8 +77,8 @@ def split_audio_into_chunks(audio_path: str, output_dir: str) -> List[str]:
             end_ms = min((i + 1) * CHUNK_DURATION_MS, total_duration_ms)
             chunk = audio[start_ms:end_ms]
 
-            chunk_path = output_dir / f"{base_name}_chunk_{i+1}.wav"
-            chunk.export(str(chunk_path), format="wav")
+            chunk_path = output_dir / f"{base_name}_chunk_{i+1}.mp3"
+            chunk.export(str(chunk_path), format="mp3", bitrate="64k")
             chunk_paths.append(str(chunk_path))
             logger.info(f"  Chunk {i+1}/{num_chunks} saved: {chunk_path.name}")
 
@@ -97,12 +97,8 @@ def prepare_audio_for_transcription(input_path: str, temp_dir: str = "./data/aud
     file_size_mb = get_file_size_mb(input_path)
     logger.info(f"Audio file size: {file_size_mb:.2f} MB")
 
-    # Check if conversion is needed
-    ext = Path(input_path).suffix.lower()
-    if ext != ".wav":
-        audio_path = convert_audio_to_wav(input_path, temp_dir)
-    else:
-        audio_path = input_path
+    # Force conversion to ensure 16kHz mono and clean headers, even if it's already a .wav
+    audio_path = convert_audio_to_wav(input_path, temp_dir)
 
     # Check if splitting is needed by size or by duration.
     file_size = os.path.getsize(audio_path)

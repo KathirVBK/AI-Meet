@@ -85,21 +85,11 @@ def run_workflow(
     transcript_segments: Optional[list] = None,
     participants: Optional[list] = None,
     speaker_mapping: Optional[dict] = None,
+    ai_persona: str = "",
+    agenda_items: Optional[list] = None,
 ) -> dict:
     """
     Execute the meeting minutes generation workflow.
-
-    Args:
-        transcript: Plain transcript text (backward-compat input).
-        club_name: Name of the student club.
-        meeting_date: Date of the meeting.
-        labelled_transcript: Speaker-labelled transcript ("Name:\n text").
-        transcript_segments: Structured list of speaker turns.
-        participants: List of participant names.
-        speaker_mapping: Dict {"Speaker 1": "Kathir", ...}.
-
-    Returns:
-        Final state dict containing mom, mom_data, action_items, etc.
     """
     app = build_workflow()
 
@@ -113,6 +103,8 @@ def run_workflow(
         # Metadata
         "club_name": club_name,
         "meeting_date": meeting_date,
+        "ai_persona": ai_persona,
+        "agenda_items": list(agenda_items or []),
         # Intermediate
         "analysis": "",
         "extracted_action_items": [],
@@ -124,10 +116,11 @@ def run_workflow(
         "error_message": None,
     }
 
-    logger.info("Starting workflow for: %s — %s (participants=%d, segments=%d)",
+    logger.info("Starting workflow for: %s — %s (participants=%d, segments=%d, has_persona=%s)",
                 club_name, meeting_date,
                 len(initial_state["participants"]),
-                len(initial_state["transcript_segments"]))
+                len(initial_state["transcript_segments"]),
+                bool(ai_persona))
     final_state = app.invoke(initial_state)
     logger.info("Workflow completed.")
 
@@ -143,11 +136,11 @@ def stream_workflow(
     transcript_segments: Optional[list] = None,
     participants: Optional[list] = None,
     speaker_mapping: Optional[dict] = None,
+    ai_persona: str = "",
+    agenda_items: Optional[list] = None,
 ):
     """
     Stream workflow execution, yielding state updates after each node.
-    Used for real-time UI progress tracking in Streamlit.
-    Accepts the same speaker-aware keyword arguments as run_workflow().
     """
     app = build_workflow()
 
@@ -159,6 +152,8 @@ def stream_workflow(
         "speaker_mapping": dict(speaker_mapping or {}),
         "club_name": club_name,
         "meeting_date": meeting_date,
+        "ai_persona": ai_persona,
+        "agenda_items": list(agenda_items or []),
         "analysis": "",
         "extracted_action_items": [],
         "validation_errors": [],

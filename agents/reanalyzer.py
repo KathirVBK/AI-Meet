@@ -15,7 +15,7 @@ from prompts.reanalyzer_prompt import REANALYZER_PROMPT
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-REANALYZER_MODEL = os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-120b")
+REANALYZER_MODEL = os.getenv("GROQ_LLM_MODEL", "qwen/qwen3.8-27b")
 
 
 def get_llm() -> ChatGroq:

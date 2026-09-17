@@ -12,6 +12,7 @@ the diarization + reconstruction pipeline can align text to speakers accurately.
 import os
 import logging
 from typing import List, Dict, Any, Optional, TypedDict
+import concurrent.futures
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -78,7 +79,7 @@ def get_groq_client() -> Groq:
         raise ValueError(
             "GROQ_API_KEY is not set. Please add your Groq API key to the .env file."
         )
-    return Groq(api_key=api_key)
+    return Groq(api_key=api_key, timeout=300.0)
 
 
 def _transcribe_with_groq(file_path: str, language: str = "en",
@@ -92,12 +93,16 @@ def _transcribe_with_groq(file_path: str, language: str = "en",
     logger.info("Transcribing (Groq Whisper %s): %s", model, file_path)
     try:
         with open(file_path, "rb") as audio_file:
-            response = client.audio.transcriptions.create(
-                model=model,
-                file=audio_file,
-                language=language,
-                response_format="text",
-            )
+            kwargs = {
+                "model": model,
+                "file": audio_file,
+                "response_format": "text",
+            }
+            if language and language.lower() not in ("auto", "none"):
+                kwargs["language"] = language
+                
+            response = client.audio.transcriptions.create(**kwargs)
+            
         text = response if isinstance(response, str) else response.text
         logger.info("Groq transcription done. Length: %d chars", len(text))
         return TranscriptionResult(
@@ -153,7 +158,7 @@ def _transcribe_with_whisperx(
     logger.info("WhisperX Stage 1 — loading ASR model...")
     model = whisperx.load_model(model_name, device, compute_type=compute_type, language=language)
     audio = whisperx.load_audio(file_path)
-    result = model.transcribe(audio, batch_size=16 if device == "cuda" else 4)
+    result = model.transcribe(audio, batch_size=32 if device == "cuda" else 4)
     detected_lang = result.get("language", language)
     logger.info("WhisperX Stage 1 done — %d segments, lang=%s",
                 len(result.get("segments", [])), detected_lang)
@@ -267,7 +272,7 @@ def _transcribe_with_faster_whisper(
     logger.info("Faster-Whisper init — device=%s, compute=%s, model=%s", device, compute, model_size)
 
     model = WhisperModel(model_size, device=device, compute_type=compute)
-    segments, info = model.transcribe(file_path, language=language, beam_size=5)
+    segments, info = model.transcribe(file_path, language=language, beam_size=2)
     detected_lang = info.language if info else language
 
     out_segments: List[SegmentTimestamp] = []
@@ -368,13 +373,22 @@ def transcribe_audio_chunks(chunk_paths: List[str], language: str = "en") -> str
     if not chunk_paths:
         raise ValueError("No audio chunks provided for transcription.")
 
-    all_transcripts = []
     total = len(chunk_paths)
+    all_transcripts = [""] * total
 
-    for i, chunk_path in enumerate(chunk_paths):
-        logger.info("Transcribing chunk %d/%d: %s", i + 1, total, chunk_path)
-        transcript = transcribe_audio_file(chunk_path, language)
-        all_transcripts.append(transcript)
+    def process_chunk(idx: int, path: str):
+        logger.info("Transcribing chunk %d/%d: %s", idx + 1, total, path)
+        return transcribe_audio_file(path, language)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, total)) as executor:
+        futures = {executor.submit(process_chunk, i, cp): i for i, cp in enumerate(chunk_paths)}
+        for future in concurrent.futures.as_completed(futures):
+            idx = futures[future]
+            try:
+                all_transcripts[idx] = future.result()
+            except Exception as e:
+                logger.error("Error transcribing chunk %d: %s", idx + 1, e)
+                raise RuntimeError(f"Transcription failed on chunk {idx + 1}: {str(e)}")
 
     full_transcript = " ".join(all_transcripts)
     logger.info("All chunks transcribed. Total length: %d chars", len(full_transcript))
@@ -391,10 +405,29 @@ def transcribe_audio_chunks_detailed(chunk_paths: List[str], language: str = "en
     merged_words: List[WordTimestamp] = []
     backend_used = "unknown"
     lang_used = language
-    time_offset = 0.0
 
-    for chunk_path in chunk_paths:
-        result = transcribe_audio_file_detailed(chunk_path, language, include_word_timestamps=True)
+    total = len(chunk_paths)
+    results = [None] * total
+
+    def process_detailed_chunk(idx: int, path: str):
+        logger.info("Detailed transcribing chunk %d/%d: %s", idx + 1, total, path)
+        return transcribe_audio_file_detailed(path, language, include_word_timestamps=True)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(2, total)) as executor:
+        futures = {executor.submit(process_detailed_chunk, i, cp): i for i, cp in enumerate(chunk_paths)}
+        for future in concurrent.futures.as_completed(futures):
+            idx = futures[future]
+            try:
+                results[idx] = future.result()
+            except Exception as e:
+                logger.error("Error detailed transcribing chunk %d: %s", idx + 1, e)
+                raise RuntimeError(f"Transcription failed on chunk {idx + 1}: {str(e)}")
+
+    time_offset = 0.0
+    for result in results:
+        if result is None:
+            continue
+        
         backend_used = result.get("backend_used", backend_used)
         lang_used = result.get("language", lang_used)
         merged_text_parts.append(result.get("text", ""))

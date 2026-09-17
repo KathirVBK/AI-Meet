@@ -227,7 +227,72 @@ export default function MeetingDetails() {
         </div>
       </div>
 
+      {/* Approval Status Banner */}
+      {meeting.approval_status === 'PENDING_REVIEW' && (
+        <div style={{
+          marginBottom: '1.5rem',
+          padding: '1rem 1.25rem',
+          borderRadius: '8px',
+          background: '#fef3c7',
+          border: '1px solid #fde68a',
+          color: '#92400e',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          fontSize: '0.9rem',
+          fontWeight: '500'
+        }}>
+          <span style={{ fontSize: '1.25rem' }}>⏳</span>
+          <div>
+            <strong>Awaiting Club Admin Approval:</strong> These meeting minutes were recorded by a club member and are pending review by a Club Coordinator or Administrator before official publication.
+          </div>
+        </div>
+      )}
 
+      {meeting.approval_status === 'REJECTED' && (
+        <div style={{
+          marginBottom: '1.5rem',
+          padding: '1rem 1.25rem',
+          borderRadius: '8px',
+          background: '#fee2e2',
+          border: '1px solid #fecaca',
+          color: '#991b1b',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '0.75rem',
+          fontSize: '0.9rem',
+          fontWeight: '500'
+        }}>
+          <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+          <div>
+            <strong>Revision Required / Rejected:</strong> This meeting recording was rejected by an administrator.
+            {meeting.approval_notes && (
+              <div style={{ marginTop: '0.35rem', fontWeight: 'normal', background: 'rgba(255, 255, 255, 0.6)', padding: '0.4rem 0.6rem', borderRadius: '4px' }}>
+                Review Notes: {meeting.approval_notes}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {meeting.approval_status === 'APPROVED' && (
+        <div style={{
+          marginBottom: '1.5rem',
+          padding: '0.6rem 1.25rem',
+          borderRadius: '8px',
+          background: '#dcfce7',
+          border: '1px solid #bbf7d0',
+          color: '#166534',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          fontSize: '0.85rem',
+          fontWeight: '600'
+        }}>
+          <span>✓ Official Club Record</span>
+          <span style={{ fontWeight: 'normal', color: '#15803d' }}>— Approved by administrator</span>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 1fr)', gap: '2rem' }}>
         <div>
@@ -287,7 +352,14 @@ export default function MeetingDetails() {
                 <ul style={{ paddingLeft: '1.5rem', lineHeight: '1.7', marginBottom: '2rem', color: 'var(--neutral-text)' }}>
                   {(meeting.mom_data?.key_decisions || meeting.mom_data?.decisions || []).length > 0
                     ? (meeting.mom_data?.key_decisions || meeting.mom_data?.decisions || []).map((kd, i) => (
-                        <li key={i} style={{ marginBottom: '0.5rem' }}>{kd}</li>
+                        <li key={i} style={{ marginBottom: '0.5rem' }}>
+                          {typeof kd === 'string' ? kd : (
+                            <span>
+                              <strong>{kd.decision || kd.title || 'Decision'}</strong>
+                              {kd.status ? ` (Status: ${kd.status})` : ''}
+                            </span>
+                          )}
+                        </li>
                       ))
                     : <li>No key decisions recorded.</li>}
                 </ul>
