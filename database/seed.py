@@ -96,7 +96,8 @@ def seed_default_users(db: Session):
             if u_info["global_role"] == "SUPER_ADMIN":
                 user.global_role = "SUPER_ADMIN"
                 user.is_active = True
-                user.password_hash = hash_password(u_info["password"])
+                if not user.password_hash:
+                    user.password_hash = hash_password(u_info["password"])
                 db.commit()
 
 
