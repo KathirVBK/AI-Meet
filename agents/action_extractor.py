@@ -13,7 +13,6 @@ import json
 import logging
 from typing import Dict, Any, List
 from langchain_groq import ChatGroq
-from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
@@ -45,14 +44,18 @@ def get_llm():
     
     if custom_api_key and custom_base_url:
         logger.info(f"Using custom LLM ({custom_model}) for Action Extractor")
-        return ChatOpenAI(
-            api_key=custom_api_key,
-            base_url=custom_base_url,
-            model=custom_model,
-            temperature=0.0,
-            max_tokens=8192,
-            max_completion_tokens=8192
-        )
+        try:
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
+                api_key=custom_api_key,
+                base_url=custom_base_url,
+                model=custom_model,
+                temperature=0.0,
+                max_tokens=8192,
+                max_completion_tokens=8192
+            )
+        except ImportError:
+            logger.warning("langchain_openai not installed, falling back to Groq")
         
     # Fallback to Groq
     api_key = os.getenv("GROQ_API_KEY")
