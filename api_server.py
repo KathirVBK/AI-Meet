@@ -539,6 +539,12 @@ async def update_user(request: UserUpdateRequest, current_user: dict = Depends(g
     """Update user profile"""
     updates = {}
     if request.club is not None:
+        user_role = (current_user.get("global_role") or "").upper()
+        if user_role not in ("SUPER_ADMIN", "ADMIN", "CLUB_ADMIN"):
+            raise HTTPException(
+                status_code=403,
+                detail="Club selection is fixed to your registration choice. Only an Administrator can change your club."
+            )
         updates["clubs"] = [{
             "club_name": request.club,
             "role": "Member",
@@ -568,15 +574,15 @@ async def get_current_user_profile(current_user: dict = Depends(get_current_user
 
 @app.get("/api/user/clubs")
 async def get_current_user_clubs(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Return only the clubs the currently authenticated user belongs to (or all active clubs if SUPER_ADMIN)."""
+    """Return only the clubs the currently authenticated user belongs to (or all active clubs if SUPER_ADMIN or ADMIN)."""
     user_id = current_user.get("id")
-    global_role = current_user.get("global_role")
+    global_role = (current_user.get("global_role") or "").upper()
     
-    if global_role == "SUPER_ADMIN":
+    if global_role in ("SUPER_ADMIN", "ADMIN", "CLUB_ADMIN"):
         clubs = db.query(Club).filter(Club.is_active == True).all()
         return {
             "success": True,
-            "clubs": [{"id": c.id, "name": c.name, "role": "Super Admin"} for c in clubs]
+            "clubs": [{"id": c.id, "name": c.name, "role": "Super Admin" if global_role == "SUPER_ADMIN" else "Admin"} for c in clubs]
         }
         
     from database.models import ClubMember
@@ -1068,6 +1074,353 @@ async def get_monthly_report_endpoint(club_id: str, month: int, year: int, db: S
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@app.get("/api/admin/clubs/{club_id}/monthly-report-pdf")
+async def export_monthly_report_pdf(club_id: str, month: int, year: int, db: Session = Depends(get_db), admin: dict = Depends(require_permission("clubs.meetings.manage"))):
+    """Generate and stream a PDF for the monthly club report."""
+    from fastapi.responses import StreamingResponse
+    import io, calendar
+
+    if admin.get("global_role") == "ADMIN":
+        if not is_coordinator_for_club_by_id(db, admin, club_id):
+            raise HTTPException(status_code=403, detail="You can only generate reports for clubs where you are a Coordinator")
+    try:
+        report = get_monthly_club_report(db, club_id, month=month, year=year)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+
+        buf = io.BytesIO()
+        month_name = calendar.month_name[month]
+        club_name = report.get("club_name", "Club")
+        doc_title = f"{club_name} — {month_name} {year} Monthly Report"
+
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4,
+            rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm,
+            title=doc_title,
+        )
+
+        styles = getSampleStyleSheet()
+        title_style  = ParagraphStyle("Title",  parent=styles["Title"],   fontSize=20, textColor=colors.HexColor("#1e3a5f"), spaceAfter=4, alignment=TA_CENTER)
+        sub_style    = ParagraphStyle("Sub",    parent=styles["Normal"],  fontSize=11, textColor=colors.HexColor("#2563eb"), spaceAfter=12, alignment=TA_CENTER)
+        h2_style     = ParagraphStyle("H2",     parent=styles["Heading2"],fontSize=12, textColor=colors.HexColor("#2563eb"), spaceBefore=14, spaceAfter=4)
+        body_style   = ParagraphStyle("Body",   parent=styles["Normal"],  fontSize=10, leading=14)
+        small_style  = ParagraphStyle("Small",  parent=styles["Normal"],  fontSize=8,  textColor=colors.grey)
+        bold_style   = ParagraphStyle("Bold",   parent=styles["Normal"],  fontSize=10, fontName="Helvetica-Bold")
+
+        story = []
+
+        # ── Cover ──
+        story.append(Spacer(1, 0.5*cm))
+        story.append(Paragraph(club_name, title_style))
+        story.append(Paragraph(f"Monthly Activity Report — {month_name} {year}", sub_style))
+        story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#2563eb"), spaceAfter=10))
+        story.append(Paragraph("Prepared by AI Meeting Assistant (MeetMind)", small_style))
+        story.append(Spacer(1, 0.6*cm))
+
+        # ── KPI Summary ──
+        kpis = [
+            ["Meetings Held", str(report.get("total_meetings", 0))],
+            ["Unique Attendees", str(len(report.get("unique_attendees", [])))],
+            ["Decisions Passed", str(report.get("total_decisions", 0))],
+            ["Action Items", str(report.get("total_action_items", 0))],
+            ["Completed Tasks", str(report.get("completed_action_items", 0))],
+            ["Completion Rate", f"{report.get('completion_rate', 0)}%"],
+        ]
+        kpi_table = Table(kpis, colWidths=[7*cm, 10*cm])
+        kpi_table.setStyle(TableStyle([
+            ("FONTNAME",   (0,0), (0,-1), "Helvetica-Bold"),
+            ("FONTSIZE",   (0,0), (-1,-1), 10),
+            ("BACKGROUND", (0,0), (0,-1), colors.HexColor("#eff6ff")),
+            ("TEXTCOLOR",  (0,0), (0,-1), colors.HexColor("#1e3a5f")),
+            ("ROWBACKGROUNDS", (1,0), (-1,-1), [colors.white, colors.HexColor("#f8fafc")]),
+            ("GRID",       (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
+            ("PADDING",    (0,0), (-1,-1), 6),
+        ]))
+        story.append(kpi_table)
+        story.append(Spacer(1, 0.5*cm))
+
+        # ── Action Items Table ──
+        action_items = report.get("action_items", [])
+        if action_items:
+            story.append(Paragraph("Action Items", h2_style))
+            ai_rows = [["#", "Task", "Owner", "Deadline", "Priority", "Status"]]
+            for idx, ai in enumerate(action_items, 1):
+                ai_rows.append([
+                    str(idx),
+                    (ai.get("task") or ai.get("title") or "")[:80],
+                    ai.get("owner") or ai.get("person") or "TBD",
+                    ai.get("deadline") or "N/A",
+                    ai.get("priority") or "Medium",
+                    ai.get("status") or "Assigned",
+                ])
+            ai_table = Table(ai_rows, colWidths=[0.7*cm, 6.5*cm, 3*cm, 2.3*cm, 2*cm, 2.3*cm])
+            ai_table.setStyle(TableStyle([
+                ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#2563eb")),
+                ("TEXTCOLOR",  (0,0), (-1,0), colors.white),
+                ("FONTNAME",   (0,0), (-1,0), "Helvetica-Bold"),
+                ("FONTSIZE",   (0,0), (-1,-1), 8),
+                ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#f0f9ff")]),
+                ("GRID",       (0,0), (-1,-1), 0.4, colors.HexColor("#cbd5e1")),
+                ("PADDING",    (0,0), (-1,-1), 4),
+                ("VALIGN",     (0,0), (-1,-1), "TOP"),
+            ]))
+            story.append(ai_table)
+            story.append(Spacer(1, 0.4*cm))
+
+        # ── Decisions ──
+        decisions = report.get("decisions", [])
+        if decisions:
+            story.append(Paragraph("Decisions Made", h2_style))
+            for d in decisions:
+                text = d.get("decision", str(d)) if isinstance(d, dict) else str(d)
+                story.append(Paragraph(f"• {text}", body_style))
+            story.append(Spacer(1, 0.3*cm))
+
+        # ── Meetings list ──
+        meetings_list = report.get("meetings", [])
+        if meetings_list:
+            story.append(Paragraph(f"Meetings This Month ({len(meetings_list)})", h2_style))
+            for m in meetings_list:
+                story.append(Paragraph(f"<b>{m.get('title','Meeting')}</b> — {m.get('meeting_date','')}", body_style))
+                if m.get("approval_status"):
+                    story.append(Paragraph(f"Status: {m['approval_status']}", small_style))
+            story.append(Spacer(1, 0.3*cm))
+
+        # ── Report Markdown (narrative) ──
+        markdown_text = report.get("report_markdown", "")
+        if markdown_text:
+            story.append(Paragraph("Detailed Narrative", h2_style))
+            # Strip markdown symbols for plain-text rendering in PDF
+            import re
+            plain = re.sub(r"[#*`_>\-]+", "", markdown_text)
+            for line in plain.splitlines():
+                line = line.strip()
+                if line:
+                    story.append(Paragraph(line, body_style))
+                else:
+                    story.append(Spacer(1, 0.2*cm))
+
+        doc.build(story)
+        buf.seek(0)
+
+        safe_club  = club_name.replace(" ", "_")[:30]
+        filename   = f"{safe_club}_report_{month_name}_{year}.pdf"
+        return StreamingResponse(
+            buf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    except ImportError:
+        raise HTTPException(status_code=500, detail="PDF library not available. Install reportlab.")
+    except Exception as e:
+        logger.error("Monthly report PDF failed for club %s: %s", club_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+
+
+@app.get("/api/admin/clubs/{club_id}/full-report-pdf")
+async def export_full_club_report_pdf(club_id: str, db: Session = Depends(get_db), admin: dict = Depends(require_permission("clubs.meetings.manage"))):
+    """Generate and stream a comprehensive PDF covering all meetings, MOMs, action items, members, and decisions for a club."""
+    from fastapi.responses import StreamingResponse
+    import io, datetime
+
+    if admin.get("global_role") == "ADMIN":
+        if not is_coordinator_for_club_by_id(db, admin, club_id):
+            raise HTTPException(status_code=403, detail="You can only generate reports for clubs where you are a Coordinator")
+
+    details = get_club_details(db, club_id)
+    if not details:
+        raise HTTPException(status_code=404, detail="Club not found")
+
+    # Gather all meetings for this club
+    from database.models import Meeting
+    from services.history_service import get_meeting_by_id
+    club_meetings_raw = db.query(Meeting).filter(Meeting.club_id == club_id).order_by(Meeting.meeting_date.desc()).all()
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, PageBreak
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+        buf = io.BytesIO()
+        club_name = details.get("name", "Club")
+        today_str = datetime.date.today().strftime("%B %d, %Y")
+        doc_title = f"{club_name} — Full Club Report"
+
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4,
+            rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm,
+            title=doc_title,
+        )
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle("Title",   parent=styles["Title"],   fontSize=22, textColor=colors.HexColor("#1e3a5f"), alignment=TA_CENTER, spaceAfter=4)
+        sub_style   = ParagraphStyle("Sub",     parent=styles["Normal"],  fontSize=11, textColor=colors.HexColor("#2563eb"), alignment=TA_CENTER, spaceAfter=14)
+        h2_style    = ParagraphStyle("H2",      parent=styles["Heading2"],fontSize=13, textColor=colors.HexColor("#2563eb"), spaceBefore=14, spaceAfter=5)
+        h3_style    = ParagraphStyle("H3",      parent=styles["Heading3"],fontSize=11, textColor=colors.HexColor("#374151"), spaceBefore=10, spaceAfter=3)
+        body_style  = ParagraphStyle("Body",    parent=styles["Normal"],  fontSize=10, leading=14)
+        small_style = ParagraphStyle("Small",   parent=styles["Normal"],  fontSize=8,  textColor=colors.grey)
+
+        story = []
+
+        # ── Cover Page ──
+        story.append(Spacer(1, 1*cm))
+        story.append(Paragraph(club_name, title_style))
+        story.append(Paragraph("Comprehensive Club Report", sub_style))
+        story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#2563eb"), spaceAfter=12))
+        story.append(Paragraph(f"Generated on {today_str} · Prepared by MeetMind AI", small_style))
+        story.append(Spacer(1, 0.5*cm))
+
+        # ── Club Overview ──
+        roster = details.get("roster", [])
+        overview_rows = [
+            ["Club Name",       club_name],
+            ["Status",          "Active" if details.get("is_active") else "Inactive"],
+            ["Description",     details.get("description") or "N/A"],
+            ["Total Members",   str(len(roster))],
+            ["Coordinators",    str(sum(1 for r in roster if r.get("role") == "Coordinator"))],
+            ["Total Meetings",  str(len(club_meetings_raw))],
+        ]
+        ov_table = Table(overview_rows, colWidths=[5*cm, 12*cm])
+        ov_table.setStyle(TableStyle([
+            ("FONTNAME",   (0,0), (0,-1), "Helvetica-Bold"),
+            ("FONTSIZE",   (0,0), (-1,-1), 10),
+            ("BACKGROUND", (0,0), (0,-1), colors.HexColor("#eff6ff")),
+            ("TEXTCOLOR",  (0,0), (0,-1), colors.HexColor("#1e3a5f")),
+            ("ROWBACKGROUNDS", (1,0), (-1,-1), [colors.white, colors.HexColor("#f8fafc")]),
+            ("GRID",       (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
+            ("PADDING",    (0,0), (-1,-1), 6),
+        ]))
+        story.append(ov_table)
+        story.append(Spacer(1, 0.4*cm))
+
+        # ── Member Roster ──
+        if roster:
+            story.append(Paragraph("Member Roster", h2_style))
+            member_rows = [["Name", "Email", "Role", "Status"]]
+            for r in roster:
+                member_rows.append([r.get("name",""), r.get("email",""), r.get("role","Member"), r.get("status","Active")])
+            m_table = Table(member_rows, colWidths=[4*cm, 6*cm, 3*cm, 4*cm])
+            m_table.setStyle(TableStyle([
+                ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#2563eb")),
+                ("TEXTCOLOR",  (0,0), (-1,0), colors.white),
+                ("FONTNAME",   (0,0), (-1,0), "Helvetica-Bold"),
+                ("FONTSIZE",   (0,0), (-1,-1), 9),
+                ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#f0f9ff")]),
+                ("GRID",       (0,0), (-1,-1), 0.4, colors.HexColor("#cbd5e1")),
+                ("PADDING",    (0,0), (-1,-1), 5),
+            ]))
+            story.append(m_table)
+            story.append(Spacer(1, 0.4*cm))
+
+        # ── Meetings & MOMs ──
+        if club_meetings_raw:
+            story.append(PageBreak())
+            story.append(Paragraph(f"Meetings & Minutes ({len(club_meetings_raw)} Total)", h2_style))
+            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0"), spaceAfter=8))
+
+            for m_obj in club_meetings_raw:
+                m_dict = get_meeting_by_id(db, m_obj.id)
+                if not m_dict:
+                    continue
+
+                mom_data    = m_dict.get("mom_data") or {}
+                action_items= m_dict.get("action_items") or mom_data.get("action_items") or []
+                decisions   = m_dict.get("decisions") or mom_data.get("decisions") or []
+                participants= mom_data.get("attendees") or mom_data.get("participants") or []
+
+                story.append(Paragraph(m_dict.get("title") or "Meeting", h3_style))
+
+                # Meeting meta
+                m_meta = [
+                    ["Date",    m_dict.get("meeting_date") or "N/A"],
+                    ["Status",  m_dict.get("approval_status") or "APPROVED"],
+                    ["Venue",   mom_data.get("venue") or "N/A"],
+                ]
+                mt = Table(m_meta, colWidths=[3.5*cm, 13.5*cm])
+                mt.setStyle(TableStyle([
+                    ("FONTNAME", (0,0), (0,-1), "Helvetica-Bold"),
+                    ("FONTSIZE", (0,0), (-1,-1), 9),
+                    ("GRID",     (0,0), (-1,-1), 0.3, colors.HexColor("#e2e8f0")),
+                    ("PADDING",  (0,0), (-1,-1), 4),
+                    ("BACKGROUND",(0,0),(0,-1), colors.HexColor("#f8fafc")),
+                ]))
+                story.append(mt)
+                story.append(Spacer(1, 0.2*cm))
+
+                # Attendees
+                if participants:
+                    story.append(Paragraph(f"Attendees: {', '.join(str(p) for p in participants)}", small_style))
+                    story.append(Spacer(1, 0.15*cm))
+
+                # Summary
+                summary = mom_data.get("executive_summary") or mom_data.get("summary") or ""
+                if summary:
+                    story.append(Paragraph(f"Summary: {summary[:500]}", body_style))
+                    story.append(Spacer(1, 0.15*cm))
+
+                # Action Items
+                if action_items:
+                    ai_rows = [["#", "Task", "Owner", "Deadline", "Status"]]
+                    for idx, ai in enumerate(action_items, 1):
+                        ai_rows.append([
+                            str(idx),
+                            (ai.get("task") or ai.get("title") or "")[:70],
+                            ai.get("owner") or ai.get("person") or "TBD",
+                            ai.get("deadline") or "N/A",
+                            ai.get("status") or "Assigned",
+                        ])
+                    ai_t = Table(ai_rows, colWidths=[0.7*cm, 7.5*cm, 3.5*cm, 2.5*cm, 2.8*cm])
+                    ai_t.setStyle(TableStyle([
+                        ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#374151")),
+                        ("TEXTCOLOR",  (0,0), (-1,0), colors.white),
+                        ("FONTNAME",   (0,0), (-1,0), "Helvetica-Bold"),
+                        ("FONTSIZE",   (0,0), (-1,-1), 8),
+                        ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#f9fafb")]),
+                        ("GRID",       (0,0), (-1,-1), 0.3, colors.HexColor("#d1d5db")),
+                        ("PADDING",    (0,0), (-1,-1), 3),
+                        ("VALIGN",     (0,0), (-1,-1), "TOP"),
+                    ]))
+                    story.append(ai_t)
+                    story.append(Spacer(1, 0.15*cm))
+
+                # Decisions
+                if decisions:
+                    for d in decisions:
+                        text = d.get("decision", str(d)) if isinstance(d, dict) else str(d)
+                        story.append(Paragraph(f"✔ {text}", small_style))
+
+                story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#e2e8f0"), spaceAfter=8))
+
+        doc.build(story)
+        buf.seek(0)
+
+        safe_club = club_name.replace(" ", "_")[:30]
+        filename  = f"{safe_club}_full_report.pdf"
+        return StreamingResponse(
+            buf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    except ImportError:
+        raise HTTPException(status_code=500, detail="PDF library not available. Install reportlab.")
+    except Exception as e:
+        logger.error("Full club PDF report failed for club %s: %s", club_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+
+
 @app.get("/api/admin/logs")
 async def fetch_audit_logs(db: Session = Depends(get_db), admin: dict = Depends(require_permission("admin.audit_logs.view"))):
     """Return audit logs"""
@@ -1121,9 +1474,212 @@ async def revoke_role_permission(role_name: str, permission_name: str, db: Sessi
     })
     return {"success": True}
 
+@app.get("/api/clubs/{club_name}/members")
+async def get_club_members_by_name(club_name: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    """Return the member roster of a club by name. Accessible by any authenticated user."""
+    club = db.query(Club).filter(Club.name == club_name).first()
+    if not club:
+        # Try case-insensitive match
+        from sqlalchemy import func as sqlfunc
+        club = db.query(Club).filter(sqlfunc.lower(Club.name) == club_name.lower()).first()
+    if not club:
+        return {"success": True, "members": []}
+    details = get_club_details(db, str(club.id))
+    if not details:
+        return {"success": True, "members": []}
+    return {"success": True, "members": details.get("roster", [])}
+
 @app.get("/api/clubs/{club_name}/agenda-templates")
 async def get_agenda_templates(club_name: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     return {"success": True, "templates": []}
+
+
+# ── Action Items Dedicated PDF Export ──
+class ActionItemExportModel(BaseModel):
+    id: Optional[str] = None
+    title: str
+    description: Optional[str] = ""
+    assigneeName: Optional[str] = "Unassigned"
+    assigneeRole: Optional[str] = "Member"
+    status: Optional[str] = "Open"
+    dueDate: Optional[str] = "N/A"
+    confidence: Optional[Any] = None
+
+class ActionItemsExportRequest(BaseModel):
+    meeting_title: str
+    club_name: Optional[str] = ""
+    meeting_date: Optional[str] = ""
+    items: List[ActionItemExportModel] = []
+
+def generate_action_items_pdf_buffer(meeting_title: str, club_name: str, meeting_date: str, items: list):
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        rightMargin=1.5*cm, leftMargin=1.5*cm, topMargin=1.8*cm, bottomMargin=1.8*cm,
+        title=f"Action Items — {meeting_title}",
+    )
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("AITitle", parent=styles["Title"], fontSize=18, textColor=colors.HexColor("#1e3a5f"), spaceAfter=4, alignment=TA_LEFT)
+    sub_style = ParagraphStyle("AISub", parent=styles["Normal"], fontSize=10, textColor=colors.HexColor("#475569"), spaceAfter=10)
+    h2_style = ParagraphStyle("AIH2", parent=styles["Heading2"], fontSize=12, textColor=colors.HexColor("#2563eb"), spaceBefore=10, spaceAfter=6)
+    cell_style = ParagraphStyle("AICell", parent=styles["Normal"], fontSize=8.5, leading=11)
+    cell_bold = ParagraphStyle("AICellBold", parent=styles["Normal"], fontSize=8.5, leading=11, fontName="Helvetica-Bold")
+    header_style = ParagraphStyle("AIHeader", parent=styles["Normal"], fontSize=9, fontName="Helvetica-Bold", textColor=colors.white)
+
+    story = []
+    story.append(Paragraph("MeetMind AI — Action Items & Deliverables Report", title_style))
+    story.append(Paragraph(f"Club: <b>{club_name or 'General Club'}</b> &nbsp;|&nbsp; Session: <b>{meeting_title}</b> &nbsp;|&nbsp; Date: <b>{meeting_date or 'N/A'}</b>", sub_style))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#2563eb"), spaceAfter=12))
+
+    total_count = len(items)
+    completed_count = sum(1 for it in items if str(it.get("status", "")).lower() == "completed")
+    in_prog_count = sum(1 for it in items if "progress" in str(it.get("status", "")).lower())
+    unassigned_count = sum(1 for it in items if not it.get("assigneeName") or it.get("assigneeName") in ("Unassigned", "TBD"))
+    open_count = total_count - completed_count
+
+    stats_data = [
+        ["Total Action Items", "Completed", "In Progress / Open", "Unassigned Tasks"],
+        [str(total_count), str(completed_count), f"{open_count} ({in_prog_count} in prog)", str(unassigned_count)]
+    ]
+    st = Table(stats_data, colWidths=[4.5*cm, 4.5*cm, 4.5*cm, 4.5*cm])
+    st.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eff6ff")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#1e40af")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 9),
+        ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 1), (-1, 1), 12),
+        ("TEXTCOLOR", (0, 1), (-1, 1), colors.HexColor("#0f172a")),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#bfdbfe")),
+        ("PADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(st)
+    story.append(Spacer(1, 0.4*cm))
+
+    story.append(Paragraph(f"Deliverables & Execution Status ({total_count} Total)", h2_style))
+    if items:
+        table_rows = [[
+            Paragraph("#", header_style),
+            Paragraph("Action Item / Deliverable", header_style),
+            Paragraph("Assignee", header_style),
+            Paragraph("Role", header_style),
+            Paragraph("Due Date", header_style),
+            Paragraph("Status", header_style),
+        ]]
+        for idx, item in enumerate(items, 1):
+            title = item.get("title") or item.get("task") or "Action Item"
+            desc = item.get("description") or ""
+            full_title = f"<b>{title}</b>" + (f"<br/><font color='#64748b' size='7.5'>{desc}</font>" if desc and desc != title else "")
+            assignee = item.get("assigneeName") or item.get("owner") or item.get("assignee") or "Unassigned"
+            role = item.get("assigneeRole") or item.get("role") or "Member"
+            due = item.get("dueDate") or item.get("deadline") or "N/A"
+            status = item.get("status") or "Open"
+
+            table_rows.append([
+                Paragraph(str(idx), cell_style),
+                Paragraph(full_title, cell_style),
+                Paragraph(assignee, cell_bold if assignee != "Unassigned" else cell_style),
+                Paragraph(role, cell_style),
+                Paragraph(str(due), cell_style),
+                Paragraph(str(status), cell_bold),
+            ])
+
+        ai_table = Table(table_rows, colWidths=[0.8*cm, 7.5*cm, 3.2*cm, 2.5*cm, 2.2*cm, 2.3*cm])
+        ai_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
+            ("ALIGN", (0, 0), (-1, 0), "LEFT"),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+            ("PADDING", (0, 0), (-1, -1), 5),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        story.append(ai_table)
+    else:
+        story.append(Paragraph("No action items recorded for this session.", sub_style))
+
+    doc.build(story)
+    buf.seek(0)
+    return buf
+
+@app.post("/api/action-items/export-pdf")
+async def export_action_items_custom_pdf(
+    payload: ActionItemsExportRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate and stream a dedicated PDF for action items passed in payload."""
+    from fastapi.responses import StreamingResponse
+    try:
+        dict_items = [it.dict() for it in payload.items]
+        buf = generate_action_items_pdf_buffer(
+            meeting_title=payload.meeting_title,
+            club_name=payload.club_name,
+            meeting_date=payload.meeting_date,
+            items=dict_items
+        )
+        safe_title = payload.meeting_title.replace(" ", "_")[:35]
+        filename = f"{safe_title}_action_items.pdf"
+        return StreamingResponse(
+            buf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        logger.error("Failed to generate action items PDF: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+
+@app.get("/api/meetings/{meeting_id}/action-items-pdf")
+async def export_meeting_action_items_pdf(
+    meeting_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate and stream a dedicated action items PDF for a specific meeting in DB."""
+    from fastapi.responses import StreamingResponse
+    meeting = get_meeting_by_id(db, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    mom_data = meeting.get("mom_data") or {}
+    action_items = meeting.get("action_items") or mom_data.get("action_items") or []
+    
+    formatted_items = []
+    for ai in action_items:
+        formatted_items.append({
+            "title": ai.get("task") or ai.get("title") or "Deliverable",
+            "description": ai.get("description") or "",
+            "assigneeName": ai.get("owner") or ai.get("assignee") or ai.get("person") or "Unassigned",
+            "assigneeRole": ai.get("role") or "Member",
+            "dueDate": ai.get("deadline") or ai.get("due_date") or "N/A",
+            "status": ai.get("status") or "Open"
+        })
+
+    try:
+        buf = generate_action_items_pdf_buffer(
+            meeting_title=meeting.get("title") or "Meeting",
+            club_name=meeting.get("club_name") or "Club",
+            meeting_date=meeting.get("meeting_date") or "",
+            items=formatted_items
+        )
+        safe_title = (meeting.get("title") or "meeting").replace(" ", "_")[:35]
+        filename = f"{safe_title}_action_items.pdf"
+        return StreamingResponse(
+            buf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        logger.error("Failed to generate meeting action items PDF: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+
 
 
 @app.get("/api/meetings/{meeting_id}/export-pdf")

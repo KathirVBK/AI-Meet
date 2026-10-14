@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { authApiCall } from '../utils/api';
+import { API_BASE_URL } from '../config';
 import { 
   Trash2, UserCheck, UserX, Shield, ShieldAlert, Activity, FileText, Settings, 
   Users, Home, UsersRound, Search, Filter, X, CheckCircle2, Clock, AlertTriangle, 
-  Bell, Sparkles, FileSpreadsheet, Send, Check, Download, Printer, Plus, RefreshCw, Eye, XCircle
+  Bell, Sparkles, FileSpreadsheet, Send, Check, Download, Printer, Plus, RefreshCw, Eye, XCircle, FileDown
 } from 'lucide-react';
 
 export default function AdminPanel() {
@@ -265,8 +266,45 @@ export default function AdminPanel() {
     showToast('Report Markdown copied to clipboard! 📋');
   };
 
+  // Generic helper: stream an authenticated PDF from the backend and trigger browser download
+  const downloadPdf = async (url, filename) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}${url}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showToast(`❌ PDF Error: ${err.detail || res.statusText}`);
+        return;
+      }
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = href;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(href);
+      showToast('✅ PDF downloaded successfully!');
+    } catch (e) {
+      console.error('PDF download failed:', e);
+      showToast('❌ PDF download failed. Is the backend running?');
+    }
+  };
+
+  const handleDownloadMonthlyReportPdf = () => {
+    if (!reportData || !reportClubId) return;
+    const filename = `${(reportData.club_name || 'club').replace(/\s+/g,'_')}_report_${reportData.month_name || ''}_${reportYear}.pdf`;
+    downloadPdf(
+      `/api/admin/clubs/${reportClubId}/monthly-report-pdf?month=${reportMonth}&year=${reportYear}`,
+      filename
+    );
+  };
+
   const handlePrintReport = () => {
-    window.print();
+    handleDownloadMonthlyReportPdf();
   };
 
   const fetchUserDetails = async (userId) => {
@@ -1204,7 +1242,7 @@ export default function AdminPanel() {
               {reportData && (
                 <div>
                   {/* Action Toolbar */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
                     <button
                       className="btn-secondary"
                       onClick={handleCopyReport}
@@ -1214,11 +1252,12 @@ export default function AdminPanel() {
                       {reportCopied ? 'Copied!' : 'Copy Markdown'}
                     </button>
                     <button
-                      className="btn-secondary"
-                      onClick={handlePrintReport}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem' }}
+                      className="btn-primary"
+                      onClick={handleDownloadMonthlyReportPdf}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1.1rem', background: 'linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}
                     >
-                      <Printer size={16} /> Print / Export PDF
+                      <FileDown size={16} />
+                      Download Report PDF
                     </button>
                   </div>
 
@@ -1880,12 +1919,25 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>
                 {selectedClub.is_active ? (
                   <button className="btn-secondary" onClick={() => handleClubStatusChange(selectedClub.id, false)} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}>Deactivate Club</button>
                 ) : (
                   <button className="btn-primary" onClick={() => handleClubStatusChange(selectedClub.id, true)}>Activate Club</button>
                 )}
+                {/* Full Club Report PDF */}
+                <button
+                  onClick={() => downloadPdf(`/api/admin/clubs/${selectedClub.id}/full-report-pdf`, `${(selectedClub.name||'club').replace(/\s+/g,'_')}_full_report.pdf`)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.45rem',
+                    padding: '0.5rem 1.1rem', background: 'linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%)',
+                    border: 'none', borderRadius: '8px', color: '#fff', fontWeight: '700',
+                    cursor: 'pointer', fontSize: '0.88rem', boxShadow: '0 4px 12px rgba(37,99,235,0.25)'
+                  }}
+                >
+                  <FileDown size={15} />
+                  Download Full Report PDF
+                </button>
               </div>
 
               <div>
@@ -1946,11 +1998,27 @@ export default function AdminPanel() {
                 {selectedClub.meetings && selectedClub.meetings.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {selectedClub.meetings.map(m => (
-                      <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: '#f9fafb', borderRadius: '4px' }}>
+                      <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                         <div>
-                          <div style={{ fontWeight: '500' }}>{m.title}</div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--neutral-text-muted)' }}>Date: {new Date(m.meeting_date).toLocaleString()}</div>
+                          <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{m.title}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--neutral-text-muted)' }}>{new Date(m.meeting_date).toLocaleString()}</div>
                         </div>
+                        <button
+                          onClick={() => downloadPdf(`/api/meetings/${m.id}/export-pdf`, `${(m.title||'meeting').replace(/\s+/g,'_')}_MOM.pdf`)}
+                          title="Download MOM as PDF"
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '0.35rem',
+                            padding: '0.35rem 0.85rem', background: '#eff6ff',
+                            border: '1px solid #bfdbfe', borderRadius: '7px',
+                            color: '#1d4ed8', fontWeight: '700', fontSize: '0.78rem', cursor: 'pointer',
+                            transition: 'background 0.15s ease'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#dbeafe'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#eff6ff'}
+                        >
+                          <FileDown size={13} />
+                          MOM PDF
+                        </button>
                       </div>
                     ))}
                   </div>

@@ -153,12 +153,23 @@ const Topbar = () => {
     }
   })();
 
+  const userRole = (user?.global_role || '').toUpperCase();
+  const isAdminOrSuperAdmin = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || userRole === 'CLUB_ADMIN';
+
+  const userRegisteredClub = (user?.clubs && user.clubs.length > 0 && user.clubs[0].club_name)
+    ? user.clubs[0].club_name
+    : null;
+
   const initialClubs = (user?.clubs && user.clubs.length > 0)
     ? user.clubs.map(c => c.club_name)
     : ['AI & ML Club'];
 
   const [clubs, setClubs] = useState(initialClubs);
-  const [activeClub, setActiveClub] = useState(initialClubs[0] || 'AI & ML Club');
+  const [activeClub, setActiveClub] = useState(
+    isAdminOrSuperAdmin 
+      ? (user?.active_club || initialClubs[0] || 'AI & ML Club') 
+      : (userRegisteredClub || 'AI & ML Club')
+  );
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -173,7 +184,13 @@ const Topbar = () => {
           if (data.clubs && data.clubs.length > 0) {
             const names = data.clubs.map(c => c.name);
             setClubs(names);
-            setActiveClub(prev => names.includes(prev) ? prev : names[0]);
+            if (!isAdminOrSuperAdmin) {
+              // Non-admin users are strictly locked to their chosen club
+              const lockedClub = userRegisteredClub || names[0];
+              setActiveClub(lockedClub);
+            } else {
+              setActiveClub(prev => names.includes(prev) ? prev : names[0]);
+            }
           }
         }
       } catch (err) {
@@ -181,16 +198,25 @@ const Topbar = () => {
       }
     };
     fetchClubs();
-  }, []);
+  }, [isAdminOrSuperAdmin, userRegisteredClub]);
 
   const roleDisplay = user?.global_role === 'SUPER_ADMIN' ? 'Super Admin' : (user?.global_role === 'ADMIN' ? 'Club Admin' : 'Member');
   const nameDisplay = user?.name || 'Kathir Super Admin';
 
   const handleSelectClub = (clubName) => {
+    if (!isAdminOrSuperAdmin) {
+      console.warn("Only Admin and Super Admin can switch clubs.");
+      return;
+    }
     setActiveClub(clubName);
     setShowClubMenu(false);
     try {
-      const updatedUser = { ...user, clubs: [{ club_name: clubName, role: 'Lead' }] };
+      const existingClubs = Array.isArray(user?.clubs) ? user.clubs : [];
+      const updatedUser = { 
+        ...user, 
+        active_club: clubName,
+        clubs: existingClubs.length > 0 ? existingClubs : [{ club_name: clubName, role: 'Admin' }]
+      };
       localStorage.setItem('user', JSON.stringify(updatedUser));
       window.dispatchEvent(new Event('club-changed'));
     } catch (e) {
@@ -224,15 +250,67 @@ const Topbar = () => {
 
       {/* Right Controls */}
       <div className="topbar-actions" style={{ position: 'relative' }}>
-        {/* Club Switcher Button */}
-        <div style={{ position: 'relative' }}>
-          <button 
-            className="club-switcher-btn" 
-            title="Switch Club"
-            onClick={() => setShowClubMenu(!showClubMenu)}
+        {/* Club Switcher (Only for Admin & Super Admin) / Read-only Assigned Club (Regular Users) */}
+        {isAdminOrSuperAdmin ? (
+          <div style={{ position: 'relative' }}>
+            <button 
+              className="club-switcher-btn" 
+              title="Switch Club (Admin Access)"
+              onClick={() => setShowClubMenu(!showClubMenu)}
+            >
+              <div className="club-switcher-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+              </div>
+              <div className="club-switcher-info">
+                <span className="club-name">{activeClub}</span>
+                <span className="club-sub">Switch Club</span>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+
+            {showClubMenu && (
+              <div style={{
+                position: 'absolute', top: '110%', right: 0, width: '220px',
+                background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 100, padding: '0.5rem',
+                display: 'flex', flexDirection: 'column', gap: '0.25rem'
+              }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', padding: '0.4rem 0.6rem' }}>
+                  Select Active Club
+                </div>
+                {clubs.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => handleSelectClub(c)}
+                    style={{
+                      padding: '0.5rem 0.75rem', borderRadius: '8px', border: 'none',
+                      textAlign: 'left', fontSize: '0.84rem', fontWeight: activeClub === c ? '700' : '500',
+                      background: activeClub === c ? '#e0e7ff' : 'transparent',
+                      color: activeClub === c ? '#4338ca' : '#1e293b', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                    }}
+                  >
+                    <span>{c}</span>
+                    {activeClub === c && <span style={{ color: '#4f46e5' }}>✔</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div 
+            className="club-assigned-badge"
+            title={`Assigned Club: ${activeClub}. Club reassignment can only be performed by an Administrator.`}
           >
             <div className="club-switcher-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                 <circle cx="9" cy="7" r="4"></circle>
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -241,42 +319,16 @@ const Topbar = () => {
             </div>
             <div className="club-switcher-info">
               <span className="club-name">{activeClub}</span>
-              <span className="club-sub">Switch Club</span>
+              <span className="club-sub">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                Assigned Club
+              </span>
             </div>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
-
-          {showClubMenu && (
-            <div style={{
-              position: 'absolute', top: '110%', right: 0, width: '220px',
-              background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 100, padding: '0.5rem',
-              display: 'flex', flexDirection: 'column', gap: '0.25rem'
-            }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', padding: '0.4rem 0.6rem' }}>
-                Select Active Club
-              </div>
-              {clubs.map(c => (
-                <button
-                  key={c}
-                  onClick={() => handleSelectClub(c)}
-                  style={{
-                    padding: '0.5rem 0.75rem', borderRadius: '8px', border: 'none',
-                    textAlign: 'left', fontSize: '0.84rem', fontWeight: activeClub === c ? '700' : '500',
-                    background: activeClub === c ? '#e0e7ff' : 'transparent',
-                    color: activeClub === c ? '#4338ca' : '#1e293b', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-                  }}
-                >
-                  <span>{c}</span>
-                  {activeClub === c && <span style={{ color: '#4f46e5' }}>✔</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Notifications Button */}
         <div style={{ position: 'relative' }}>

@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { authApiCall } from '../utils/api';
+import { API_BASE_URL } from '../config';
 import { 
-  CheckCircle2, AlertTriangle, Clock, Search, Download, 
-  Plus, Bell, ChevronRight, ArrowLeft, Check, Edit2, Trash2, X, Sliders, ShieldCheck
+  CheckCircle2, AlertTriangle, Clock, Search, Download, FileDown,
+  Plus, Bell, ChevronRight, ArrowLeft, Check, Edit2, Trash2, X, Sliders, ShieldCheck, UserCheck
 } from 'lucide-react';
 
 export default function ActionItems() {
@@ -18,6 +19,13 @@ export default function ActionItems() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+
+  // Assign unassigned task modal state
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assigningItem, setAssigningItem] = useState(null);
+  const [clubMembers, setClubMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [selectedMemberId, setSelectedMemberId] = useState('');
 
   // New action item form state
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -533,6 +541,58 @@ export default function ActionItems() {
     showToast('Action item updated successfully!');
   };
 
+  // Open Assign modal for an unassigned item, fetch club members
+  const handleOpenAssign = async (item) => {
+    setAssigningItem(item);
+    setSelectedMemberId('');
+    setShowAssignModal(true);
+    setLoadingMembers(true);
+    try {
+      const clubName = currentMeeting?.club || '';
+      const result = await authApiCall(`/api/clubs/${encodeURIComponent(clubName)}/members`);
+      if (result.success && Array.isArray(result.data?.members)) {
+        setClubMembers(result.data.members);
+      } else {
+        setClubMembers([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch club members:', err);
+      setClubMembers([]);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  // Confirm assignment of task to selected member
+  const handleConfirmAssign = () => {
+    if (!assigningItem || !selectedMemberId) return;
+    const member = clubMembers.find(m => m.user_id === selectedMemberId || m.email === selectedMemberId);
+    if (!member) return;
+    setMeetings(prev => prev.map(m => {
+      if (m.id !== selectedMeetingId) return m;
+      return {
+        ...m,
+        actionItems: m.actionItems.map(t => {
+          if (t.id === assigningItem.id) {
+            return {
+              ...t,
+              assigneeName: member.name,
+              assigneeRole: member.role || 'Member',
+              avatarBg: '#4f46e5',
+              status: t.status === 'Open' ? 'Open' : t.status
+            };
+          }
+          return t;
+        })
+      };
+    }));
+    showToast(`✅ Task assigned to ${member.name}`);
+    setShowAssignModal(false);
+    setAssigningItem(null);
+    setSelectedMemberId('');
+    setClubMembers([]);
+  };
+
   // Export CSV for this meeting
   const handleExportCSV = () => {
     if (!currentMeeting) return;
@@ -550,6 +610,62 @@ export default function ActionItems() {
     link.click();
     document.body.removeChild(link);
     showToast('Action items CSV exported successfully!');
+  };
+
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  // Export Action Items as PDF
+  const handleExportPDF = async () => {
+    if (!currentMeeting) return;
+    setDownloadingPdf(true);
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        meeting_title: currentMeeting.title || 'Meeting',
+        club_name: currentMeeting.club || '',
+        meeting_date: currentMeeting.date || '',
+        items: currentMeeting.actionItems.map(t => ({
+          title: t.title,
+          description: t.description,
+          assigneeName: t.assigneeName,
+          assigneeRole: t.assigneeRole,
+          status: t.status,
+          dueDate: t.dueDate,
+          confidence: t.confidence
+        }))
+      };
+
+      const res = await fetch(`${API_BASE_URL}/api/action-items/export-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showToast(`❌ PDF Error: ${err.detail || res.statusText}`);
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${currentMeeting.title.toLowerCase().replace(/\s+/g, '_')}_action_items.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast('✅ Action items PDF exported successfully!');
+    } catch (err) {
+      console.error('Failed to export action items PDF:', err);
+      showToast('❌ Failed to download Action Items PDF');
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   return (
@@ -758,6 +874,21 @@ export default function ActionItems() {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <button
+                onClick={handleExportPDF}
+                disabled={downloadingPdf}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.4rem',
+                  padding: '0.55rem 1rem', background: '#ffffff', border: '1px solid #cbd5e1',
+                  borderRadius: '10px', fontSize: '0.84rem', fontWeight: '600', color: '#1e40af',
+                  cursor: downloadingPdf ? 'not-allowed' : 'pointer'
+                }}
+                title="Download Action Items as PDF"
+              >
+                <FileDown size={14} />
+                <span>{downloadingPdf ? 'Exporting...' : 'Export PDF'}</span>
+              </button>
+
+              <button
                 onClick={handleExportCSV}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.4rem',
@@ -909,22 +1040,46 @@ export default function ActionItems() {
                   }}>
                     {/* Assignee pill */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      {/* Avatar circle */}
                       <div style={{
                         width: '32px', height: '32px', borderRadius: '50%',
-                        background: item.avatarBg || '#4f46e5', color: '#ffffff',
+                        background: (item.assigneeName === 'Unassigned' || item.assigneeName === 'TBD') ? '#e2e8f0' : (item.avatarBg || '#4f46e5'),
+                        color: (item.assigneeName === 'Unassigned' || item.assigneeName === 'TBD') ? '#94a3b8' : '#ffffff',
                         fontSize: '0.76rem', fontWeight: '800',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: (item.assigneeName === 'Unassigned' || item.assigneeName === 'TBD') ? '2px dashed #cbd5e1' : 'none'
                       }}>
-                        {item.assigneeName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        {(item.assigneeName === 'Unassigned' || item.assigneeName === 'TBD') ? '?' : item.assigneeName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#0f172a' }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: '700', color: (item.assigneeName === 'Unassigned' || item.assigneeName === 'TBD') ? '#94a3b8' : '#0f172a' }}>
                           {item.assigneeName}
                         </div>
                         <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
                           {item.assigneeRole}
                         </div>
                       </div>
+                      {/* Assign button for unassigned tasks */}
+                      {(item.assigneeName === 'Unassigned' || item.assigneeName === 'TBD' || !item.assigneeName) && (
+                        <button
+                          onClick={() => handleOpenAssign(item)}
+                          title="Assign this task to a club member"
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '0.35rem',
+                            padding: '0.35rem 0.8rem', borderRadius: '8px',
+                            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                            color: '#ffffff', border: 'none', fontSize: '0.78rem',
+                            fontWeight: '700', cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(79,70,229,0.3)',
+                            transition: 'opacity 0.15s ease'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                        >
+                          <UserCheck size={13} />
+                          <span>Assign</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* Interactive Controls: Tracking & Approving */}
@@ -1245,6 +1400,142 @@ export default function ActionItems() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Assign Member ── */}
+      {showAssignModal && assigningItem && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.5)',
+          backdropFilter: 'blur(4px)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff', borderRadius: '20px', width: '100%', maxWidth: '480px',
+            boxShadow: '0 24px 48px rgba(0,0,0,0.18)', overflow: 'hidden', animation: 'scaleUp 0.2s ease'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '1.25rem 1.5rem', borderBottom: '1px solid #f1f5f9',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <UserCheck size={16} color="#ffffff" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>Assign Task</h3>
+                  <p style={{ fontSize: '0.72rem', color: '#64748b', margin: 0 }}>{currentMeeting?.club} Members</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowAssignModal(false); setAssigningItem(null); setClubMembers([]); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '0.25rem' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Task Preview */}
+            <div style={{ padding: '1rem 1.5rem', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+              <p style={{ fontSize: '0.72rem', fontWeight: '700', color: '#64748b', margin: '0 0 0.3rem 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Assigning Task</p>
+              <p style={{ fontSize: '0.88rem', fontWeight: '600', color: '#0f172a', margin: 0, lineHeight: 1.4 }}>{assigningItem.title}</p>
+            </div>
+
+            {/* Members List */}
+            <div style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155' }}>Select a Club Member to Assign</label>
+
+              {loadingMembers ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '0.88rem' }}>
+                  <div style={{ marginBottom: '0.5rem' }}>⏳</div>
+                  Loading members…
+                </div>
+              ) : clubMembers.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '0.88rem' }}>
+                  <div style={{ marginBottom: '0.5rem' }}>👥</div>
+                  No members found for this club.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '260px', overflowY: 'auto' }}>
+                  {clubMembers.map(member => {
+                    const memberId = member.user_id || member.email;
+                    const isSelected = selectedMemberId === memberId;
+                    return (
+                      <button
+                        key={memberId}
+                        onClick={() => setSelectedMemberId(memberId)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.75rem',
+                          padding: '0.75rem 1rem', borderRadius: '10px', border: 'none',
+                          background: isSelected ? 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)' : '#f8fafc',
+                          cursor: 'pointer', textAlign: 'left', width: '100%',
+                          outline: isSelected ? '2px solid #6366f1' : '2px solid transparent',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f1f5f9'; }}
+                        onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = '#f8fafc'; }}
+                      >
+                        {/* Avatar */}
+                        <div style={{
+                          width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
+                          background: isSelected ? '#4f46e5' : '#e2e8f0',
+                          color: isSelected ? '#ffffff' : '#64748b',
+                          fontSize: '0.8rem', fontWeight: '800',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                          {member.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || '?'}
+                        </div>
+                        {/* Info */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.88rem', fontWeight: '700', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {member.name}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{member.email} · {member.role || 'Member'}</div>
+                        </div>
+                        {/* Check mark */}
+                        {isSelected && (
+                          <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Check size={12} color="#ffffff" strokeWidth={3} />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowAssignModal(false); setAssigningItem(null); setClubMembers([]); }}
+                  style={{ flex: 1, padding: '0.65rem', background: '#f1f5f9', border: 'none', borderRadius: '10px', fontSize: '0.85rem', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmAssign}
+                  disabled={!selectedMemberId}
+                  style={{
+                    flex: 2, padding: '0.65rem', border: 'none', borderRadius: '10px',
+                    fontSize: '0.85rem', fontWeight: '700', cursor: selectedMemberId ? 'pointer' : 'not-allowed',
+                    background: selectedMemberId ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : '#e2e8f0',
+                    color: selectedMemberId ? '#ffffff' : '#94a3b8',
+                    boxShadow: selectedMemberId ? '0 4px 12px rgba(79,70,229,0.3)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                    <UserCheck size={14} />
+                    Confirm Assignment
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

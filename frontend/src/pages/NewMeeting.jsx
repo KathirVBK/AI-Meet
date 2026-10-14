@@ -20,7 +20,10 @@ export default function NewMeeting() {
   const fileInputRef = useRef(null);
   const token = localStorage.getItem('token');
   const currentUser = readUser();
-  const isSuperAdmin = currentUser?.global_role === 'SUPER_ADMIN';
+  const userRole = (currentUser?.global_role || '').toUpperCase();
+  const isSuperAdmin = userRole === 'SUPER_ADMIN';
+  const isAdmin = userRole === 'ADMIN' || userRole === 'CLUB_ADMIN';
+  const isAdminOrSuperAdmin = isSuperAdmin || isAdmin;
 
   const [clubsList, setClubsList] = useState([]);
   const [clubsLoading, setClubsLoading] = useState(true);
@@ -405,7 +408,7 @@ export default function NewMeeting() {
                   <AlertCircle size={15} style={{ flexShrink: 0 }} />
                   <span>You are not assigned to any club. Only club members or club admins can generate MOMs.</span>
                 </div>
-              ) : clubsList.length === 1 ? (
+              ) : !isAdminOrSuperAdmin || clubsList.length === 1 ? (
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #c7d2fe',
@@ -416,7 +419,7 @@ export default function NewMeeting() {
                     <span>{formData.clubName || clubsList[0]}</span>
                   </div>
                   <span style={{ fontSize: '0.72rem', background: '#e0e7ff', color: '#4338ca', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: '700' }}>
-                    Your Club
+                    Assigned Club
                   </span>
                 </div>
               ) : (
@@ -437,7 +440,7 @@ export default function NewMeeting() {
                 </div>
               )}
               <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem' }}>
-                {isSuperAdmin ? 'Super Admin can generate meetings for any club.' : 'Meeting MOM is strictly scoped to your authorized club.'}
+                {isSuperAdmin ? 'Super Admin can generate meetings for any club.' : (isAdmin ? 'Admin can select any authorized club.' : 'Meeting MOM is strictly locked to your registered club.')}
               </div>
             </div>
 

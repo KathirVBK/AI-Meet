@@ -64,7 +64,7 @@ def register_user(db: Session, user_data: dict) -> Dict[str, Any]:
         password_hash=hash_password(user_data.get("password", "")),
         department=user_data.get("department", ""),
         year=user_data.get("year", ""),
-        global_role="Student",
+        global_role="STUDENT",
     )
     db.add(user)
     db.flush()  # Get user.id

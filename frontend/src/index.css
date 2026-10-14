@@ -368,6 +368,35 @@ button {
   border-color: #cbd5e1;
 }
 
+.club-assigned-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: default;
+  user-select: none;
+  text-align: left;
+}
+
+.club-assigned-badge .club-switcher-icon {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.club-assigned-badge .club-name {
+  color: #334155;
+}
+
+.club-assigned-badge .club-sub {
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
 .club-switcher-icon {
   width: 28px;
   height: 28px;
