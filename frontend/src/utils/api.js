@@ -2,8 +2,7 @@
  * API utility for safe fetch calls with proper error handling.
  * Handles network errors, HTML responses, JSON parsing errors, and HTTP status codes.
  */
-
-const API_BASE_URL = 'http://localhost:5000';
+import { API_BASE_URL } from '../config';
 
 /**
  * Check if the response content is likely JSON

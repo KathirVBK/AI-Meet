@@ -12,14 +12,21 @@ DB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))
 os.makedirs(DB_DIR, exist_ok=True)
 DB_PATH = os.path.join(DB_DIR, "meetmind.db")
 
-# SQLite connection string (swap this line for PostgreSQL)
-DATABASE_URL = f"sqlite:///{DB_PATH}"
-
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},  # Required for SQLite + FastAPI
-    echo=False,
-)
+# Database URL: use DATABASE_URL env if provided (e.g. Postgres on Render), otherwise SQLite
+raw_db_url = os.getenv("DATABASE_URL")
+if raw_db_url:
+    # Render and Heroku use postgres:// which SQLAlchemy 1.4+ expects as postgresql://
+    if raw_db_url.startswith("postgres://"):
+        raw_db_url = raw_db_url.replace("postgres://", "postgresql://", 1)
+    DATABASE_URL = raw_db_url
+    engine = create_engine(DATABASE_URL, echo=False)
+else:
+    DATABASE_URL = f"sqlite:///{DB_PATH}"
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},  # Required for SQLite + FastAPI
+        echo=False,
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

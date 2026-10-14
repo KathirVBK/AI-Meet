@@ -407,6 +407,39 @@ async def process_audio(
             except Exception:
                 pass
 
+
+@app.post("/api/meetings/process")
+async def process_meeting_upload(
+    audio: Optional[UploadFile] = File(default=None),
+    file: Optional[UploadFile] = File(default=None),
+    club_name: str = Form(...),
+    meeting_date: str = Form(...),
+    title: Optional[str] = Form(default=None),
+    meeting_type: Optional[str] = Form(default=None),
+    num_speakers: Optional[int] = Form(default=None),
+    diarization_method: str = Form(default="auto"),
+    language: str = Form(default="auto"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Direct alias endpoint for /api/meetings/process accepting either 'audio' or 'file'."""
+    upload_file = audio or file
+    if not upload_file:
+        raise HTTPException(status_code=400, detail="No audio file uploaded. Expected 'audio' or 'file' form field.")
+    return await process_audio(
+        file=upload_file,
+        club_name=club_name,
+        meeting_date=meeting_date,
+        title=title,
+        meeting_type=meeting_type,
+        num_speakers=num_speakers,
+        diarization_method=diarization_method,
+        language=language,
+        current_user=current_user,
+        db=db
+    )
+
+
 @app.post("/api/chat")
 def chat(request: ChatRequest, current_user: dict = Depends(get_current_user)):
     """Answer questions using RAG and memory."""
@@ -1237,4 +1270,5 @@ async def export_meeting_pdf(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api_server:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("api_server:app", host="0.0.0.0", port=port, reload=False)

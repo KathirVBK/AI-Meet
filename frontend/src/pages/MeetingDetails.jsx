@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { authApiCall, apiCall } from '../utils/api';
+import { API_BASE_URL } from '../config';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -172,8 +173,7 @@ export default function MeetingDetails() {
   const handleDownload = async () => {
     try {
       const token = localStorage.getItem('token');
-      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_BASE}/api/meetings/${meeting.id}/export-pdf`, {
+      const response = await fetch(`${API_BASE_URL}/api/meetings/${meeting.id}/export-pdf`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       if (response.ok) {
