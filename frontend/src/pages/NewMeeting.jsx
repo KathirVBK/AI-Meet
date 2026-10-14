@@ -284,8 +284,18 @@ export default function NewMeeting() {
           body: data,
         });
 
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || json.detail || 'Processing failed');
+        let json = null;
+        try {
+          json = await res.json();
+        } catch {
+          const text = await res.text().catch(() => '');
+          if (!res.ok) {
+            throw new Error(text || `Server returned HTTP ${res.status}`);
+          }
+        }
+        if (!res.ok) {
+          throw new Error(json?.error || json?.detail || `Processing failed (HTTP ${res.status})`);
+        }
 
         if (json && json.id) {
           navigate(`/meeting/${json.id}`);
@@ -300,7 +310,11 @@ export default function NewMeeting() {
       }
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Error processing meeting');
+      let msg = err.message || 'Error processing meeting';
+      if (msg === 'Failed to fetch') {
+        msg = 'Connection to backend failed. Please ensure your Render backend service is awake and running.';
+      }
+      setError(msg);
       setLoading(false);
     }
   };

@@ -80,18 +80,18 @@ def run_pyannote_diarization(audio_path: str, num_speakers: Optional[int] = None
     Returns:
         DiarizationResult with speaker segments and labels.
     """
+    auth_token = _get_huggingface_token()
+    if not auth_token:
+        logger.info(
+            "No Hugging Face token found. Pyannote models require authentication. "
+            "Using fast single-speaker fallback."
+        )
+        return _fallback_single_speaker_diarization(audio_path)
+
     try:
         from pyannote.audio import Pipeline
     except ImportError:
         logger.warning("pyannote.audio is not installed. Falling back to mock diarization.")
-        return _fallback_single_speaker_diarization(audio_path)
-
-    auth_token = _get_huggingface_token()
-    if not auth_token:
-        logger.warning(
-            "No Hugging Face token found (HF_TOKEN, HUGGINGFACE_TOKEN, or PYANNOTE_AUTH_TOKEN). "
-            "Pyannote models require authentication. Falling back to single-speaker mode."
-        )
         return _fallback_single_speaker_diarization(audio_path)
 
     try:
@@ -161,6 +161,11 @@ def run_whisperx_diarization(audio_path: str, diarize_model=None) -> Diarization
     Returns:
         DiarizationResult.
     """
+    auth_token = _get_huggingface_token()
+    if not auth_token:
+        logger.info("No Hugging Face token found for WhisperX diarization. Falling back to single-speaker mode.")
+        return _fallback_single_speaker_diarization(audio_path)
+
     try:
         import whisperx
         import torch
@@ -168,12 +173,14 @@ def run_whisperx_diarization(audio_path: str, diarize_model=None) -> Diarization
         logger.warning("WhisperX not available for diarization. Using fallback.")
         return _fallback_single_speaker_diarization(audio_path)
 
-    auth_token = _get_huggingface_token()
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     try:
         if diarize_model is None:
-            diarize_model = whisperx.DiarizationPipeline(
+            diarize_cls = getattr(whisperx, "DiarizationPipeline", None)
+            if diarize_cls is None:
+                from whisperx.diarize import DiarizationPipeline as diarize_cls
+            diarize_model = diarize_cls(
                 use_auth_token=auth_token, device=device
             )
 
@@ -283,9 +290,12 @@ def diarize_audio(
     elif method == "fallback":
         return _fallback_single_speaker_diarization(audio_path)
     else:  # auto
+        auth_token = _get_huggingface_token()
+        if not auth_token:
+            logger.info("No Hugging Face token configured; using fast single-speaker mode.")
+            return _fallback_single_speaker_diarization(audio_path)
         result = run_pyannote_diarization(audio_path, num_speakers=num_speakers)
         if result.speaker_count <= 1:
-            # Pyannote couldn't detect multiple speakers, try WhisperX
             alt_result = run_whisperx_diarization(audio_path)
             if alt_result.speaker_count > result.speaker_count:
                 return alt_result

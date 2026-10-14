@@ -44,10 +44,10 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="MeetMind AI API")
 
-# Allow CORS for React frontend
+# Allow CORS for React frontend (dynamically mirrors origin for credentialed requests)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

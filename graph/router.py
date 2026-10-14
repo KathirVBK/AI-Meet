@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-MAX_VALIDATION_ATTEMPTS = 3
+MAX_VALIDATION_ATTEMPTS = 1
 
 
 def validation_router(state: dict) -> str:
