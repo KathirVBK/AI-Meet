@@ -26,6 +26,15 @@ export default function NewMeeting() {
   const [clubsLoading, setClubsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
 
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [recordingLive, setRecordingLive] = useState(false);
+  const [attendees, setAttendees] = useState([]);
+  const [newAttendeeName, setNewAttendeeName] = useState('');
+  const [showAddAttendee, setShowAddAttendee] = useState(false);
+
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef(null);
   const mediaRecorderRef = useRef(null);
