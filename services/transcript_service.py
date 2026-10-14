@@ -347,7 +347,10 @@ def process_audio_full_pipeline(
 
     # ── Step 8: Cleanup temp chunk files ───────────────────────────────────
     try:
-        cleanup_temp_files(chunk_paths)
+        to_clean = list(chunk_paths)
+        if wav_for_diarization and wav_for_diarization not in to_clean and wav_for_diarization != audio_file_path:
+            to_clean.append(wav_for_diarization)
+        cleanup_temp_files(to_clean)
     except Exception as e:
         logger.warning("Temp cleanup issue: %s", e)
 

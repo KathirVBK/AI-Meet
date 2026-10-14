@@ -29,6 +29,8 @@ def retrieve_relevant_docs(
         List of relevant Document objects.
     """
     store = get_vector_store()
+    if store is None:
+        return []
 
     search_kwargs = {"k": top_k}
     if filter_club:

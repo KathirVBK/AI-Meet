@@ -18,11 +18,28 @@ COLLECTION_NAME = "meeting_minutes"
 _vector_store_instance = None
 
 
-def get_vector_store() -> Chroma:
+def is_rag_disabled() -> bool:
+    """
+    Returns True if RAG vector store should be bypassed (e.g. on Render Free Tier 512MB RAM
+    or when DISABLE_RAG=true is set) to prevent Out-Of-Memory (OOM) SIGKILL crashes.
+    """
+    if os.getenv("DISABLE_RAG", "false").lower() in ("true", "1", "yes"):
+        return True
+    if os.getenv("RENDER", "false").lower() in ("true", "1") and os.getenv("ENABLE_RENDER_RAG", "false").lower() not in ("true", "1"):
+        return True
+    return False
+
+
+def get_vector_store() -> Optional[Chroma]:
     """
     Return a singleton Chroma vector store instance.
     Loads or creates the persistent ChromaDB collection.
+    Returns None if running in low-memory cloud mode to prevent OOM.
     """
+    if is_rag_disabled():
+        logger.info("ChromaDB vector store disabled in low-memory / Render cloud environment.")
+        return None
+
     global _vector_store_instance
     if _vector_store_instance is None:
         logger.info(f"Initializing ChromaDB at: {CHROMA_DB_PATH}")
@@ -38,11 +55,18 @@ def get_vector_store() -> Chroma:
 def add_documents_to_store(documents: list) -> int:
     """
     Add a list of LangChain Document objects to the vector store.
+    Safely bypasses in low-memory environments.
 
     Returns:
         Number of documents added.
     """
+    if is_rag_disabled():
+        logger.info("Bypassing ChromaDB indexing for %d chunks (low-memory cloud mode).", len(documents))
+        return len(documents)
+
     store = get_vector_store()
+    if store is None:
+        return 0
     store.add_documents(documents)
     logger.info(f"Added {len(documents)} document chunks to ChromaDB.")
     return len(documents)
@@ -50,9 +74,11 @@ def add_documents_to_store(documents: list) -> int:
 
 def get_collection_count() -> int:
     """Return the number of documents in the collection."""
+    if is_rag_disabled():
+        return 0
     try:
         store = get_vector_store()
-        return store._collection.count()
+        return store._collection.count() if store else 0
     except Exception:
         return 0
 

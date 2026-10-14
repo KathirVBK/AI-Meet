@@ -314,20 +314,26 @@ async def process_audio(
         )
 
         # ChromaDB — indexed after meeting is persisted so meeting_id is available
-        try:
-            docs = await run_in_threadpool(
-                create_meeting_documents,
-                transcript=plain_text,
-                mom_text=mom_md,
-                club_name=club_name,
-                meeting_date=meeting_date,
-                meeting_title=mom_data.get("meeting_title") if mom_data else None,
-                decisions=mom_data.get("decisions") if mom_data else None,
-                meeting_id=entry_id,
-            )
-            await run_in_threadpool(add_documents_to_store, docs)
-        except Exception as e:
-            logger.warning("ChromaDB add failed, continuing without RAG ingest: %s", e)
+        # On Render / low-memory containers, skip local sentence-transformers to stay under 512MB RAM
+        is_render = os.getenv("RENDER", "").lower() in ("true", "1")
+        rag_disabled = os.getenv("DISABLE_RAG", "").lower() in ("true", "1") or (is_render and os.getenv("ENABLE_RENDER_RAG", "").lower() != "true")
+        if not rag_disabled:
+            try:
+                docs = await run_in_threadpool(
+                    create_meeting_documents,
+                    transcript=plain_text,
+                    mom_text=mom_md,
+                    club_name=club_name,
+                    meeting_date=meeting_date,
+                    meeting_title=mom_data.get("meeting_title") if mom_data else None,
+                    decisions=mom_data.get("decisions") if mom_data else None,
+                    meeting_id=entry_id,
+                )
+                await run_in_threadpool(add_documents_to_store, docs)
+            except Exception as e:
+                logger.warning("ChromaDB add failed, continuing without RAG ingest: %s", e)
+        else:
+            logger.info("ChromaDB RAG ingest skipped in cloud container to protect 512MB RAM ceiling.")
 
         # ── 6. Structured response per the spec ────────────────────────────
         meeting_summary = _build_summary(mom_data)

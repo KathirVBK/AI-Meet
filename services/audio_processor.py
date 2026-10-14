@@ -122,11 +122,14 @@ def prepare_audio_for_transcription(input_path: str, temp_dir: str = "./data/aud
 
 
 def cleanup_temp_files(file_paths: List[str]) -> None:
-    """Remove temporary audio chunk files after transcription."""
+    """Remove temporary audio chunk or converted files after transcription."""
     for path in file_paths:
         try:
-            if os.path.exists(path) and "_chunk_" in path:
-                os.remove(path)
-                logger.info(f"Cleaned up temp file: {path}")
+            if path and os.path.exists(path):
+                normalized = path.replace("\\", "/").lower()
+                # Safely delete chunk files or temporary files in audio/temp folders
+                if "_chunk_" in normalized or "temp" in normalized or "data/audio" in normalized:
+                    os.remove(path)
+                    logger.info(f"Cleaned up temp file: {path}")
         except Exception as e:
             logger.warning(f"Could not delete temp file {path}: {e}")
