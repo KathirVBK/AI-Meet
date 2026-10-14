@@ -66,6 +66,18 @@ export default function AdminPanel() {
   const [reportData, setReportData] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportCopied, setReportCopied] = useState(false);
+
+  // Modal States
+  const [createClubModal, setCreateClubModal] = useState(false);
+  const [createClubName, setCreateClubName] = useState('');
+  const [createClubDesc, setCreateClubDesc] = useState('');
+  const [createClubLoading, setCreateClubLoading] = useState(false);
+  const [addMemberModal, setAddMemberModal] = useState(null); // club object or null
+  const [addMemberEmail, setAddMemberEmail] = useState('');
+  const [addMemberRole, setAddMemberRole] = useState('Member');
+  const [addMemberLoading, setAddMemberLoading] = useState(false);
+  const [tabLoading, setTabLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   
   // Current logged in Super Admin check
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -80,7 +92,8 @@ export default function AdminPanel() {
   };
 
   const fetchData = async () => {
-    setLoading(true);
+    setTabLoading(true);
+    setErrorMessage('');
     try {
       // Always refresh pending meetings count in background for tab badge
       try {
@@ -93,12 +106,15 @@ export default function AdminPanel() {
       if (activeTab === 'dashboard') {
         const res = await authApiCall('/api/admin/stats');
         if (res.success) setStats(res.data);
+        else setErrorMessage(res.error || 'Failed to load dashboard stats');
       } else if (activeTab === 'approvals') {
         const res = await authApiCall('/api/admin/pending-meetings');
         if (res.success) setPendingMeetings(res.data.meetings);
+        else setErrorMessage(res.error || 'Failed to load pending meetings');
       } else if (activeTab === 'nudges') {
         const resA = await authApiCall('/api/admin/club-action-items');
         if (resA.success) setActionItems(resA.data.action_items);
+        else setErrorMessage(resA.error || 'Failed to load action items');
         const resC = await authApiCall('/api/admin/clubs');
         if (resC.success) setClubsList(resC.data.clubs);
       } else if (activeTab === 'reports') {
@@ -109,7 +125,11 @@ export default function AdminPanel() {
           if (targetClubId) {
             setReportClubId(targetClubId);
             fetchMonthlyReport(targetClubId, reportMonth, reportYear);
+          } else {
+            setErrorMessage('No clubs available for report generation.');
           }
+        } else {
+          setErrorMessage(resC.error || 'Failed to load clubs');
         }
       } else if (activeTab === 'roles') {
         const resU = await authApiCall('/api/admin/users');
@@ -121,24 +141,49 @@ export default function AdminPanel() {
       } else if (activeTab === 'users') {
         const resU = await authApiCall('/api/admin/users');
         if (resU.success) setUsers(resU.data.users);
+        else setErrorMessage(resU.error || 'Failed to load users');
+        // Also load clubs so we can show a dropdown in the Assign Club form
+        const resC = await authApiCall('/api/admin/clubs');
+        if (resC.success) setClubsList(resC.data.clubs);
       } else if (activeTab === 'clubs') {
         const res = await authApiCall('/api/admin/clubs');
         if (res.success) setClubsList(res.data.clubs);
+        else setErrorMessage(res.error || 'Failed to load clubs');
       } else if (activeTab === 'meetings') {
         const res = await authApiCall('/api/admin/meetings');
         if (res.success) setMeetings(res.data.meetings);
+        else setErrorMessage(res.error || 'Failed to load meetings');
         const resC = await authApiCall('/api/admin/clubs');
         if (resC.success) setClubsList(resC.data.clubs);
-      } else if (activeTab === 'audit_logs' || activeTab === 'activity') {
+      } else if (activeTab === 'audit_logs') {
+        // SUPER_ADMIN only — requires admin.audit_logs.view permission
         const res = await authApiCall('/api/admin/logs');
         if (res.success) setLogs(res.data.logs);
+        else setErrorMessage(res.error || 'Failed to load audit logs');
+      } else if (activeTab === 'activity') {
+        // For ADMIN: use club-scoped action items as activity proxy
+        // For SUPER_ADMIN: use audit logs
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (currentUser.global_role === 'SUPER_ADMIN') {
+          const res = await authApiCall('/api/admin/logs');
+          if (res.success) setLogs(res.data.logs);
+          else setErrorMessage(res.error || 'Failed to load activity logs');
+        } else {
+          // ADMIN: load club-scoped nudge/approval activity from action items
+          const resA = await authApiCall('/api/admin/club-action-items');
+          if (resA.success) setActionItems(resA.data.action_items);
+          else setErrorMessage(resA.error || 'No activity data available');
+        }
       } else if (activeTab === 'settings') {
         const res = await authApiCall('/api/admin/settings');
         if (res.success) setSettings(res.data.settings);
+        else setErrorMessage(res.error || 'Failed to load settings');
       }
     } catch (err) {
       console.error('Failed to load admin data:', err);
+      setErrorMessage('Failed to load data. Please try again.');
     } finally {
+      setTabLoading(false);
       setLoading(false);
     }
   };
@@ -228,12 +273,12 @@ export default function AdminPanel() {
     setLoadingDetails(true);
     try {
       const res = await authApiCall(`/api/admin/users/${userId}`);
-      if (res.success) {
-        setUserDetails(res);
+      if (res.success && res.data) {
+        setUserDetails(res.data);
       }
     } catch (err) {
       console.error('Failed to load user details:', err);
-      alert('Error fetching user details');
+      showToast('❌ Error fetching user details');
     } finally {
       setLoadingDetails(false);
     }
@@ -241,10 +286,10 @@ export default function AdminPanel() {
 
   const handleRoleChange = async (userId, newRole) => {
     if (userId === currentUser.id && newRole !== 'SUPER_ADMIN') {
-      alert("You cannot demote yourself from SUPER_ADMIN.");
+      showToast('⚠️ You cannot demote your own SUPER_ADMIN role.');
       return;
     }
-    if (!window.confirm(`Are you sure you want to change this user's role to ${newRole}?`)) return;
+    if (!window.confirm(`Change this user's role to ${newRole}?`)) return;
     
     try {
       const res = await authApiCall(`/api/admin/users/${userId}/role`, {
@@ -255,20 +300,23 @@ export default function AdminPanel() {
         setUsers(users.map(u => u.id === userId ? { ...u, global_role: newRole } : u));
         if (selectedUser?.id === userId) {
           setUserDetails(prev => ({...prev, user: {...prev.user, global_role: newRole}}));
+          setSelectedUser(prev => prev?.id === userId ? {...prev, global_role: newRole} : prev);
         }
+        showToast(`✅ Role updated to ${newRole}`);
+      } else {
+        showToast(`❌ ${res.error || 'Failed to update role'}`);
       }
     } catch (err) {
-      console.error('Failed to update role:', err);
-      alert('Error updating role');
+      showToast('❌ Error updating role');
     }
   };
 
   const handleStatusChange = async (userId, isActive) => {
     if (userId === currentUser.id && !isActive) {
-      alert("You cannot suspend your own account.");
+      showToast('⚠️ You cannot suspend your own account.');
       return;
     }
-    if (!window.confirm(`Are you sure you want to ${isActive ? 'activate' : 'suspend'} this user?`)) return;
+    if (!window.confirm(`${isActive ? 'Activate' : 'Suspend'} this user?`)) return;
 
     try {
       const res = await authApiCall(`/api/admin/users/${userId}/status`, {
@@ -279,11 +327,14 @@ export default function AdminPanel() {
         setUsers(users.map(u => u.id === userId ? { ...u, is_active: isActive } : u));
         if (selectedUser?.id === userId) {
           setUserDetails(prev => ({...prev, user: {...prev.user, is_active: isActive}}));
+          setSelectedUser(prev => prev?.id === userId ? {...prev, is_active: isActive} : prev);
         }
+        showToast(`✅ User ${isActive ? 'activated' : 'suspended'} successfully`);
+      } else {
+        showToast(`❌ ${res.error || 'Failed to update status'}`);
       }
     } catch (err) {
-      console.error('Failed to update status:', err);
-      alert('Error updating status');
+      showToast('❌ Error updating user status');
     }
   };
 
@@ -300,14 +351,20 @@ export default function AdminPanel() {
         body: JSON.stringify({ club_name: clubName, role: role })
       });
       if (res.success) {
-        setUsers(users.map(u => u.id === userId ? res.user : u));
+        setUsers(users.map(u => u.id === userId ? res.data.user : u));
         if (selectedUser?.id === userId) {
-          setUserDetails(prev => ({...prev, user: res.user}));
+          setUserDetails(prev => ({...prev, user: res.data.user}));
+          setSelectedUser(res.data.user);
         }
+        const fetchClubs = await authApiCall('/api/admin/clubs');
+        if (fetchClubs.success) setClubsList(fetchClubs.data.clubs);
         form.reset();
+        showToast(`✅ Assigned ${clubName} (${role}) successfully`);
+      } else {
+        showToast(`❌ ${res.error || res.detail || 'Failed to assign club'}`);
       }
     } catch (err) {
-      alert('Error assigning club: ' + err.message);
+      showToast('❌ Error assigning club: ' + err.message);
     }
   };
 
@@ -318,27 +375,35 @@ export default function AdminPanel() {
         method: 'DELETE'
       });
       if (res.success) {
-        setUsers(users.map(u => u.id === userId ? res.user : u));
+        setUsers(users.map(u => u.id === userId ? res.data.user : u));
         if (selectedUser?.id === userId) {
-          setUserDetails(prev => ({...prev, user: res.user}));
+          setUserDetails(prev => ({...prev, user: res.data.user}));
+          setSelectedUser(res.data.user);
         }
+        const fetchClubs = await authApiCall('/api/admin/clubs');
+        if (fetchClubs.success) setClubsList(fetchClubs.data.clubs);
+        showToast(`✅ Removed from ${clubName}`);
+      } else {
+        showToast(`❌ ${res.error || res.detail || 'Failed to remove from club'}`);
       }
     } catch (err) {
-      alert('Error removing club: ' + err.message);
+      showToast('❌ Error removing club: ' + err.message);
     }
   };
 
   const handleDeleteMeeting = async (meetingId) => {
-    if (!window.confirm('Are you sure you want to completely delete this meeting? This action cannot be undone.')) return;
+    if (!window.confirm('Delete this meeting permanently? This cannot be undone.')) return;
     
     try {
       const res = await authApiCall(`/api/admin/meetings/${meetingId}`, { method: 'DELETE' });
       if (res.success) {
         setMeetings(meetings.filter(m => m.id !== meetingId));
+        showToast('🗑️ Meeting deleted successfully');
+      } else {
+        showToast(`❌ ${res.error || 'Failed to delete meeting'}`);
       }
     } catch (err) {
-      console.error('Failed to delete meeting:', err);
-      alert('Error deleting meeting');
+      showToast('❌ Error deleting meeting');
     }
   };
 
@@ -384,22 +449,32 @@ export default function AdminPanel() {
   };
 
   const handleCreateClub = async () => {
-    const name = prompt("Enter new club name:");
-    if (!name) return;
-    const desc = prompt("Enter club description (optional):");
+    setCreateClubModal(true);
+    setCreateClubName('');
+    setCreateClubDesc('');
+  };
+
+  const submitCreateClub = async (e) => {
+    e.preventDefault();
+    if (!createClubName.trim()) return;
+    setCreateClubLoading(true);
     try {
       const res = await authApiCall('/api/admin/clubs', {
         method: 'POST',
-        body: JSON.stringify({ name, description: desc })
+        body: JSON.stringify({ name: createClubName.trim(), description: createClubDesc.trim() })
       });
       if (res.success) {
         const fetchRes = await authApiCall('/api/admin/clubs');
         if (fetchRes.success) setClubsList(fetchRes.data.clubs);
+        setCreateClubModal(false);
+        showToast(`✅ Club "${createClubName}" created!`);
       } else {
-        alert(res.error || "Failed to create club");
+        showToast(`❌ ${res.error || 'Failed to create club'}`);
       }
     } catch(err) {
-      alert("Error creating club");
+      showToast('❌ Error creating club');
+    } finally {
+      setCreateClubLoading(false);
     }
   };
 
@@ -431,22 +506,70 @@ export default function AdminPanel() {
     }
   };
 
-  const handleAddClubMember = async (clubId) => {
-    const email = prompt("Enter the user's email address:");
-    if (!email) return;
-    const role = window.confirm("Make this user a Coordinator? (Cancel for standard Member)") ? "Coordinator" : "Member";
+  const handleAddClubMember = (club) => {
+    setAddMemberModal(club);
+    setAddMemberEmail('');
+    setAddMemberRole('Member');
+  };
+
+  const submitAddClubMember = async (e) => {
+    e.preventDefault();
+    if (!addMemberEmail.trim() || !addMemberModal) return;
+    setAddMemberLoading(true);
     try {
-      const res = await authApiCall(`/api/admin/clubs/${clubId}/members`, {
+      const res = await authApiCall(`/api/admin/clubs/${addMemberModal.id}/members`, {
         method: 'POST',
-        body: JSON.stringify({ email, role })
+        body: JSON.stringify({ email: addMemberEmail.trim(), role: addMemberRole })
       });
       if (res.success) {
-        openClubDetails(clubId); // Refresh modal
+        await openClubDetails(addMemberModal.id);
+        const fetchClubs = await authApiCall('/api/admin/clubs');
+        if (fetchClubs.success) setClubsList(fetchClubs.data.clubs);
+        setAddMemberModal(null);
+        showToast(`✅ Member added to ${addMemberModal.name}!`);
       } else {
-        alert(res.error || "Failed to add member");
+        showToast(`❌ ${res.error || res.detail || 'Failed to add member'}`);
       }
     } catch(err) {
-      alert("Error adding member");
+      showToast('❌ Error adding member');
+    } finally {
+      setAddMemberLoading(false);
+    }
+  };
+
+  const handleChangeMemberRole = async (clubId, userId, newRole) => {
+    try {
+      const res = await authApiCall(`/api/admin/clubs/${clubId}/members/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ role: newRole })
+      });
+      if (res.success) {
+        await openClubDetails(clubId);
+        const fetchClubs = await authApiCall('/api/admin/clubs');
+        if (fetchClubs.success) setClubsList(fetchClubs.data.clubs);
+        showToast(`✅ Member role updated to ${newRole}`);
+      } else {
+        showToast(`❌ ${res.error || res.detail || 'Failed to update role'}`);
+      }
+    } catch(err) {
+      showToast('❌ Error updating member role');
+    }
+  };
+
+  const handleRemoveClubMember = async (clubId, userId, memberName) => {
+    if (!window.confirm(`Remove ${memberName || 'this member'} from club?`)) return;
+    try {
+      const res = await authApiCall(`/api/admin/clubs/${clubId}/members/${userId}`, { method: 'DELETE' });
+      if (res.success) {
+        await openClubDetails(clubId);
+        const fetchClubs = await authApiCall('/api/admin/clubs');
+        if (fetchClubs.success) setClubsList(fetchClubs.data.clubs);
+        showToast(`✅ Member removed from club`);
+      } else {
+        showToast(`❌ ${res.error || res.detail || 'Failed to remove member'}`);
+      }
+    } catch(err) {
+      showToast('❌ Error removing member');
     }
   };
 
@@ -496,6 +619,8 @@ export default function AdminPanel() {
   }
 
   const isSuperAdmin = currentUser?.global_role === 'SUPER_ADMIN';
+  // ADMIN users need at least one club membership to have scoped data
+  const adminHasNoClubs = !isSuperAdmin && (!currentUser?.clubs || currentUser.clubs.length === 0);
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: <Home size={18} /> },
@@ -548,6 +673,51 @@ export default function AdminPanel() {
         </div>
       </div>
 
+      {/* ── No-Club Setup Banner for ADMIN users ── */}
+      {adminHasNoClubs && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(234,179,8,0.12) 0%, rgba(245,158,11,0.06) 100%)',
+          border: '1.5px solid rgba(234,179,8,0.45)',
+          borderRadius: '14px',
+          padding: '1.5rem 2rem',
+          marginBottom: '2rem',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '1.25rem'
+        }}>
+          <div style={{
+            width: '44px', height: '44px', borderRadius: '12px',
+            background: 'rgba(234,179,8,0.18)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          }}>
+            <AlertTriangle size={24} color="#b45309" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#92400e', marginBottom: '0.4rem' }}>
+              Account Setup Incomplete — No Clubs Assigned
+            </h3>
+            <p style={{ color: '#a16207', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '0.75rem' }}>
+              Your admin account has been created, but you haven't been assigned to any club yet.
+              As a <strong>Club Admin</strong>, your dashboard, meetings, approvals, and task data are scoped
+              to the clubs you manage. Without a club assignment, all sections will appear empty.
+            </p>
+            <div style={{
+              background: 'rgba(255,255,255,0.6)', borderRadius: '10px',
+              padding: '0.9rem 1.1rem', border: '1px solid rgba(234,179,8,0.3)'
+            }}>
+              <p style={{ fontSize: '0.88rem', color: '#78350f', fontWeight: '600', marginBottom: '0.3rem' }}>
+                ✅ What to do next:
+              </p>
+              <ol style={{ margin: 0, paddingLeft: '1.2rem', color: '#92400e', fontSize: '0.88rem', lineHeight: '1.8' }}>
+                <li>Ask your <strong>Super Admin</strong> to go to <em>User Management → Find your account → Assign Club</em>.</li>
+                <li>Once assigned, refresh this page — your data will appear automatically.</li>
+                <li>You will then be able to manage meetings, approvals, member nudges, and reports for your assigned club.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: '2rem' }}>
         {/* Sub-Sidebar for Admin Sections */}
         <div style={{ width: '250px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -582,20 +752,56 @@ export default function AdminPanel() {
 
         {/* Main Content Area */}
         <div style={{ flex: 1 }}>
-          {activeTab === 'dashboard' && (
+
+          {/* Per-tab loading spinner */}
+          {tabLoading && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '3rem', gap: '0.75rem', color: 'var(--neutral-text-muted)'
+            }}>
+              <RefreshCw size={20} className="spin" />
+              <span style={{ fontSize: '1rem' }}>Loading...</span>
+            </div>
+          )}
+
+          {/* Error state */}
+          {!tabLoading && errorMessage && (
+            <div style={{
+              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+              borderRadius: '12px', padding: '1rem 1.5rem', marginBottom: '1.5rem',
+              display: 'flex', alignItems: 'center', gap: '0.75rem'
+            }}>
+              <AlertTriangle size={18} color="var(--danger)" />
+              <span style={{ color: '#991b1b', fontSize: '0.95rem' }}>{errorMessage}</span>
+              <button onClick={fetchData} className="btn-secondary"
+                style={{ marginLeft: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}>
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!tabLoading && activeTab === 'dashboard' && (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
                 <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.5))' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--neutral-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Users</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--neutral-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {isSuperAdmin ? 'Total Users' : 'Club Members'}
+                  </span>
                   <span style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--neutral-text)' }}>{stats.total_users}</span>
                 </div>
                 <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.02))', border: '1px solid rgba(16,185,129,0.2)' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Users</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {isSuperAdmin ? 'Active Users' : 'Active Members'}
+                  </span>
                   <span style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--success)' }}>{stats.active_users}</span>
                 </div>
                 <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'linear-gradient(135deg, rgba(239,68,68,0.1), rgba(239,68,68,0.02))', border: '1px solid rgba(239,68,68,0.3)' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Suspended Users</span>
-                  <span style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--danger)' }}>{stats.inactive_users}</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {isSuperAdmin ? 'Suspended Users' : 'Meetings This Month'}
+                  </span>
+                  <span style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--danger)' }}>
+                    {isSuperAdmin ? stats.inactive_users : stats.total_meetings}
+                  </span>
                 </div>
                 <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.5))' }}>
                   <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--neutral-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Clubs Active</span>
@@ -637,7 +843,7 @@ export default function AdminPanel() {
           {/* ══════════════════════════════════════════════════════════════════
               FEATURE 1: MEETING APPROVALS WORKFLOW
           ══════════════════════════════════════════════════════════════════ */}
-          {activeTab === 'approvals' && (
+          {!tabLoading && activeTab === 'approvals' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <div>
@@ -738,7 +944,7 @@ export default function AdminPanel() {
           {/* ══════════════════════════════════════════════════════════════════
               FEATURE 2: ACTION ITEMS TRACKING & NUDGES
           ══════════════════════════════════════════════════════════════════ */}
-          {activeTab === 'nudges' && (
+          {!tabLoading && activeTab === 'nudges' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <div>
@@ -929,7 +1135,7 @@ export default function AdminPanel() {
           {/* ══════════════════════════════════════════════════════════════════
               FEATURE 4: AUTOMATED MONTHLY CLUB REPORTS
           ══════════════════════════════════════════════════════════════════ */}
-          {activeTab === 'reports' && (
+          {!tabLoading && activeTab === 'reports' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <div>
@@ -1059,7 +1265,7 @@ export default function AdminPanel() {
             </div>
           )}
 
-          {activeTab === 'users' && (
+          {!tabLoading && activeTab === 'users' && (
             <div className="card">
               <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 User Directory
@@ -1126,7 +1332,18 @@ export default function AdminPanel() {
                         <td style={{ padding: '1rem 0.5rem', fontSize: '0.85rem' }}>
                           {u.clubs?.length > 0 ? (
                             u.clubs.slice(0,2).map(c => <div key={c.club_name}>{c.club_name}</div>)
-                          ) : '-'}
+                          ) : (
+                            u.global_role === 'ADMIN' ? (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                background: 'rgba(234,179,8,0.15)', color: '#92400e',
+                                border: '1px solid rgba(234,179,8,0.4)', borderRadius: '6px',
+                                padding: '0.15rem 0.5rem', fontSize: '0.75rem', fontWeight: '600'
+                              }}>
+                                <AlertTriangle size={12} /> No Club
+                              </span>
+                            ) : <span style={{ color: 'var(--neutral-text-muted)' }}>—</span>
+                          )}
                           {u.clubs?.length > 2 && <div style={{color: 'var(--neutral-text-muted)'}}>+{u.clubs.length - 2} more</div>}
                         </td>
                         <td style={{ padding: '1rem 0.5rem' }}>
@@ -1139,7 +1356,7 @@ export default function AdminPanel() {
                         </td>
                         <td style={{ padding: '1rem 0.5rem', display: 'flex', gap: '0.5rem' }}>
                           <button 
-                            onClick={() => { setSelectedUser(u); fetchUserDetails(u.id); }}
+                            onClick={() => { setSelectedUser(u); setUserDetails(null); fetchUserDetails(u.id); }}
                             className="btn-secondary"
                             style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}
                           >
@@ -1157,13 +1374,15 @@ export default function AdminPanel() {
             </div>
           )}
 
-          {activeTab === 'clubs' && (
+          {!tabLoading && activeTab === 'clubs' && (
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h3 style={{ fontSize: '1.1rem' }}>Club Management</h3>
-                <button className="btn-primary" onClick={handleCreateClub}>
-                  <Users size={16} style={{ marginRight: '0.5rem' }} /> Create New Club
-                </button>
+                {isSuperAdmin && (
+                  <button className="btn-primary" onClick={handleCreateClub}>
+                    <Users size={16} style={{ marginRight: '0.5rem' }} /> Create New Club
+                  </button>
+                )}
               </div>
               <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
                 <thead>
@@ -1186,7 +1405,15 @@ export default function AdminPanel() {
                       <td style={{ padding: '1rem 0', fontSize: '0.9rem' }}>
                         {club.admins.length > 0 ? club.admins.join(', ') : <span style={{ color: 'var(--neutral-text-muted)' }}>None</span>}
                       </td>
-                      <td style={{ padding: '1rem 0' }}>{club.member_count}</td>
+                      <td style={{ padding: '1rem 0' }}>
+                        <span style={{ 
+                          display: 'inline-flex', alignItems: 'center', gap: '0.4rem', 
+                          fontWeight: '700', color: (club.member_count ?? 0) > 0 ? '#1e293b' : '#94a3b8' 
+                        }}>
+                          <Users size={14} color="#64748b" />
+                          {club.member_count ?? 0} {(club.member_count === 1) ? 'Member' : 'Members'}
+                        </span>
+                      </td>
                       <td style={{ padding: '1rem 0' }}>{club.meeting_count}</td>
                       <td style={{ padding: '1rem 0' }}>
                         <span className={`badge ${club.is_active ? 'completed' : 'pending'}`}>
@@ -1203,7 +1430,7 @@ export default function AdminPanel() {
             </div>
           )}
 
-          {activeTab === 'meetings' && (
+          {!tabLoading && activeTab === 'meetings' && (
             <div className="card">
               <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>Meeting Management</h3>
               
@@ -1285,7 +1512,7 @@ export default function AdminPanel() {
             </div>
           )}
 
-          {activeTab === 'roles' && (
+          {!tabLoading && activeTab === 'roles' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
               <div className="card">
                 <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>Role-Based Access Control (RBAC)</h3>
@@ -1383,9 +1610,57 @@ export default function AdminPanel() {
             </div>
           )}
 
-          {(activeTab === 'activity' || activeTab === 'audit_logs') && (
+          {!tabLoading && (activeTab === 'activity' || activeTab === 'audit_logs') && (
             <div className="card">
-              <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>{activeTab === 'activity' ? 'System Activity Logs' : 'Security Audit Logs'}</h3>
+              <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>
+                {activeTab === 'activity' ? 'System Activity Logs' : 'Security Audit Logs'}
+              </h3>
+              
+              {/* For ADMIN role on activity tab: show club-scoped task summary */}
+              {activeTab === 'activity' && !isSuperAdmin ? (
+                <div>
+                  <p style={{ marginBottom: '1.5rem', color: 'var(--neutral-text-muted)', fontSize: '0.95rem' }}>
+                    Showing recent task activity for your club's members.
+                  </p>
+                  {actionItems.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--neutral-text-muted)' }}>
+                      <Activity size={40} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                      <p>No task activity recorded yet for your club.</p>
+                    </div>
+                  ) : (
+                    <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                          <th style={{ paddingBottom: '0.75rem', fontSize: '0.8rem', color: 'var(--neutral-text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Task</th>
+                          <th style={{ paddingBottom: '0.75rem', fontSize: '0.8rem', color: 'var(--neutral-text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Assignee</th>
+                          <th style={{ paddingBottom: '0.75rem', fontSize: '0.8rem', color: 'var(--neutral-text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Status</th>
+                          <th style={{ paddingBottom: '0.75rem', fontSize: '0.8rem', color: 'var(--neutral-text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Nudges</th>
+                          <th style={{ paddingBottom: '0.75rem', fontSize: '0.8rem', color: 'var(--neutral-text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Deadline</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {actionItems.slice(0, 30).map(ai => (
+                          <tr key={ai.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '0.85rem 0', fontWeight: '500', maxWidth: '240px' }}>{ai.task}</td>
+                            <td style={{ padding: '0.85rem 0', fontSize: '0.9rem' }}>{ai.owner || 'TBD'}</td>
+                            <td style={{ padding: '0.85rem 0' }}>
+                              <span className={`badge ${ ['Completed','Done'].includes(ai.status) ? 'completed' : ai.is_overdue ? 'pending' : 'in-progress' }`}>
+                                {ai.status || 'Assigned'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.85rem 0', fontSize: '0.9rem' }}>{ai.nudge_count || 0}</td>
+                            <td style={{ padding: '0.85rem 0', fontSize: '0.85rem', color: ai.is_overdue ? 'var(--danger)' : 'var(--neutral-text-muted)' }}>
+                              {ai.deadline || '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              ) : (
+                // SUPER_ADMIN or audit_logs tab: show audit logs
+                <div>
               
               <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
@@ -1438,10 +1713,12 @@ export default function AdminPanel() {
                   {filteredLogs.length === 0 && <tr><td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: 'var(--neutral-text-muted)' }}>No logs match your criteria.</td></tr>}
                 </tbody>
               </table>
+              </div>
+              )}
             </div>
           )}
 
-          {activeTab === 'settings' && (
+          {!tabLoading && activeTab === 'settings' && (
             <div className="card">
               <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>Global System Settings</h3>
               
@@ -1567,15 +1844,40 @@ export default function AdminPanel() {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
                 <div>
-                  <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
                     {selectedClub.name}
                     <span className={`badge ${selectedClub.is_active ? 'completed' : 'pending'}`}>{selectedClub.is_active ? 'ACTIVE' : 'INACTIVE'}</span>
+                    <span className="badge in-progress" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Users size={12} /> {(selectedClub.roster?.length ?? selectedClub.member_count ?? 0)} {(selectedClub.roster?.length === 1 || selectedClub.member_count === 1) ? 'Member' : 'Members'}
+                    </span>
                   </h2>
                   <p style={{ color: 'var(--neutral-text-muted)' }}>{selectedClub.description}</p>
                 </div>
                 <button onClick={() => setSelectedClub(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--neutral-text-muted)' }}>
                   <X size={24} />
                 </button>
+              </div>
+
+              {/* Quick Stat Cards for this Particular Club */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total Members</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0f172a' }}>
+                    {selectedClub.roster?.length ?? selectedClub.member_count ?? 0}
+                  </span>
+                </div>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Coordinators</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: '800', color: '#4f46e5' }}>
+                    {selectedClub.roster?.filter(r => r.role === 'Coordinator').length ?? 0}
+                  </span>
+                </div>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Recorded Meetings</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0f172a' }}>
+                    {selectedClub.meetings?.length ?? selectedClub.meeting_count ?? 0}
+                  </span>
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -1588,9 +1890,11 @@ export default function AdminPanel() {
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h4 style={{ color: 'var(--neutral-text-muted)' }}>Member Roster</h4>
-                  <button className="btn-secondary" onClick={() => handleAddClubMember(selectedClub.id)} style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>
-                    + Add Member via Email
+                  <h4 style={{ color: 'var(--neutral-text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    Member Roster ({selectedClub.roster?.length ?? selectedClub.member_count ?? 0})
+                  </h4>
+                  <button className="btn-secondary" onClick={() => handleAddClubMember(selectedClub)} style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>
+                    + Add Member
                   </button>
                 </div>
                 {selectedClub.roster && selectedClub.roster.length > 0 ? (
@@ -1600,6 +1904,7 @@ export default function AdminPanel() {
                         <th style={{ paddingBottom: '0.5rem' }}>Name</th>
                         <th style={{ paddingBottom: '0.5rem' }}>Email</th>
                         <th style={{ paddingBottom: '0.5rem' }}>Club Role</th>
+                        <th style={{ paddingBottom: '0.5rem', textAlign: 'right' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1609,6 +1914,23 @@ export default function AdminPanel() {
                           <td style={{ padding: '0.75rem 0' }}>{r.email}</td>
                           <td style={{ padding: '0.75rem 0' }}>
                             <span className={`badge ${r.role === 'Coordinator' ? 'in-progress' : 'pending'}`}>{r.role}</span>
+                          </td>
+                          <td style={{ padding: '0.75rem 0', textAlign: 'right', display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                            <button
+                              className="btn-secondary"
+                              onClick={() => handleChangeMemberRole(selectedClub.id, r.user_id, r.role === 'Coordinator' ? 'Member' : 'Coordinator')}
+                              style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
+                              title={r.role === 'Coordinator' ? 'Demote to Member' : 'Promote to Coordinator'}
+                            >
+                              {r.role === 'Coordinator' ? '⬇ Member' : '⬆ Coordinator'}
+                            </button>
+                            <button
+                              onClick={() => handleRemoveClubMember(selectedClub.id, r.user_id, r.name)}
+                              style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--danger)', borderRadius: '6px', padding: '0.25rem 0.5rem', cursor: 'pointer', fontSize: '0.78rem' }}
+                              title="Remove from club"
+                            >
+                              <Trash2 size={13} />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1646,7 +1968,7 @@ export default function AdminPanel() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div className="card" style={{ width: '90%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
             <button 
-              onClick={() => setSelectedUser(null)} 
+              onClick={() => { setSelectedUser(null); setUserDetails(null); }} 
               style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'none', border: 'none', cursor: 'pointer' }}
             >
               <X size={24} color="var(--neutral-text-muted)" />
@@ -1691,6 +2013,21 @@ export default function AdminPanel() {
 
               <div>
                 <h3 style={{ marginBottom: '1rem', fontSize: '1.05rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Club Memberships</h3>
+                
+                {/* Warning when this ADMIN user has no clubs */}
+                {selectedUser.global_role === 'ADMIN' && (!selectedUser.clubs || selectedUser.clubs.length === 0) && (
+                  <div style={{
+                    background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.4)',
+                    borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem',
+                    display: 'flex', alignItems: 'flex-start', gap: '0.5rem'
+                  }}>
+                    <AlertTriangle size={16} color="#b45309" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <p style={{ fontSize: '0.85rem', color: '#92400e', margin: 0, lineHeight: '1.5' }}>
+                      <strong>No club assigned.</strong> This Admin user's portal will appear empty until assigned to at least one club below.
+                    </p>
+                  </div>
+                )}
+
                 <ul style={{ listStyle: 'none', padding: 0, marginBottom: '1rem' }}>
                   {selectedUser.clubs?.map((c, i) => (
                     <li key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid var(--border)' }}>
@@ -1710,8 +2047,17 @@ export default function AdminPanel() {
                     <li style={{ color: 'var(--neutral-text-muted)', fontStyle: 'italic' }}>No club memberships</li>
                   )}
                 </ul>
-                <form onSubmit={(e) => handleAssignClub(selectedUser.id, e)} style={{ display: 'flex', gap: '0.5rem' }}>
-                  <input name="club" placeholder="Club Name..." required style={{ flex: 1, padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                <form onSubmit={(e) => handleAssignClub(selectedUser.id, e)} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {clubsList.length > 0 ? (
+                    <select name="club" required style={{ flex: 1, padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)', minWidth: '120px' }}>
+                      <option value="">Select Club...</option>
+                      {clubsList.map(c => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input name="club" placeholder="Club Name..." required style={{ flex: 1, padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                  )}
                   <select name="role" style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)' }}>
                     <option value="Member">Member</option>
                     <option value="Coordinator">Coordinator</option>
@@ -1727,21 +2073,21 @@ export default function AdminPanel() {
             ) : userDetails ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
                 <div>
-                  <h4 style={{ marginBottom: '0.5rem' }}>Meetings Created ({userDetails.meetings.length})</h4>
+                  <h4 style={{ marginBottom: '0.5rem' }}>Meetings Created ({userDetails.meetings?.length || 0})</h4>
                   <ul style={{ listStyle: 'none', padding: 0, maxHeight: '200px', overflowY: 'auto' }}>
-                    {userDetails.meetings.map(m => (
+                    {userDetails.meetings?.map(m => (
                       <li key={m.id} style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.9rem' }}>
                         <div><strong>{m.title || m.mom_data?.title || 'Meeting'}</strong></div>
                         <div style={{ color: 'var(--neutral-text-muted)' }}>{m.club_name} - {m.meeting_date}</div>
                       </li>
                     ))}
-                    {userDetails.meetings.length === 0 && <li style={{ color: 'var(--neutral-text-muted)' }}>No meetings created</li>}
+                    {(!userDetails.meetings || userDetails.meetings.length === 0) && <li style={{ color: 'var(--neutral-text-muted)' }}>No meetings created</li>}
                   </ul>
                 </div>
                 <div>
-                  <h4 style={{ marginBottom: '0.5rem' }}>System Audit Logs ({userDetails.activity.length})</h4>
+                  <h4 style={{ marginBottom: '0.5rem' }}>System Audit Logs ({userDetails.activity?.length || 0})</h4>
                   <ul style={{ listStyle: 'none', padding: 0, maxHeight: '200px', overflowY: 'auto' }}>
-                    {userDetails.activity.map(log => (
+                    {userDetails.activity?.map(log => (
                       <li key={log.id} style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.9rem' }}>
                         <div><strong>{log.action}</strong> - {new Date(log.timestamp).toLocaleString()}</div>
                         <pre style={{ margin: 0, fontSize: '0.75rem', background: '#f3f4f6', padding: '0.25rem', marginTop: '0.25rem' }}>
@@ -1749,7 +2095,7 @@ export default function AdminPanel() {
                         </pre>
                       </li>
                     ))}
-                    {userDetails.activity.length === 0 && <li style={{ color: 'var(--neutral-text-muted)' }}>No audit logs</li>}
+                    {(!userDetails.activity || userDetails.activity.length === 0) && <li style={{ color: 'var(--neutral-text-muted)' }}>No audit logs</li>}
                   </ul>
                 </div>
               </div>
@@ -1874,7 +2220,114 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* New Agenda Template Modal */}
+      {/* ── Create Club Modal ── */}
+      {createClubModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', zIndex: 1200, padding: '2rem'
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '480px', position: 'relative' }}>
+            <button onClick={() => setCreateClubModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', cursor: 'pointer' }}>
+              <X size={20} color="var(--neutral-text-muted)" />
+            </button>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: '700', marginBottom: '0.25rem' }}>Create New Club</h2>
+            <p style={{ color: 'var(--neutral-text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              Create a new student organization club in the system.
+            </p>
+            <form onSubmit={submitCreateClub}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontWeight: '600', fontSize: '0.88rem', marginBottom: '0.4rem' }}>Club Name *</label>
+                <input
+                  type="text"
+                  value={createClubName}
+                  onChange={e => setCreateClubName(e.target.value)}
+                  placeholder="e.g. Robotics Club"
+                  required
+                  style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.95rem' }}
+                />
+              </div>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', fontWeight: '600', fontSize: '0.88rem', marginBottom: '0.4rem' }}>Description (optional)</label>
+                <textarea
+                  value={createClubDesc}
+                  onChange={e => setCreateClubDesc(e.target.value)}
+                  placeholder="Brief description of the club's purpose..."
+                  rows={3}
+                  style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.9rem', fontFamily: 'inherit', resize: 'vertical' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn-secondary" onClick={() => setCreateClubModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={createClubLoading} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {createClubLoading ? <RefreshCw size={14} className="spin" /> : <Plus size={14} />}
+                  Create Club
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add Member Modal ── */}
+      {addMemberModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', zIndex: 1200, padding: '2rem'
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '440px', position: 'relative' }}>
+            <button onClick={() => setAddMemberModal(null)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', cursor: 'pointer' }}>
+              <X size={20} color="var(--neutral-text-muted)" />
+            </button>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.25rem' }}>Add Member</h2>
+            <p style={{ color: 'var(--neutral-text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              Add a user to <strong>{addMemberModal.name}</strong> by their email address.
+            </p>
+            <form onSubmit={submitAddClubMember}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontWeight: '600', fontSize: '0.88rem', marginBottom: '0.4rem' }}>User Email *</label>
+                <input
+                  type="email"
+                  list="registered-users-datalist"
+                  value={addMemberEmail}
+                  onChange={e => setAddMemberEmail(e.target.value)}
+                  placeholder="member@university.edu"
+                  required
+                  autoFocus
+                  style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.95rem' }}
+                />
+                <datalist id="registered-users-datalist">
+                  {users.map(u => (
+                    <option key={u.id} value={u.email}>{u.name} ({u.email})</option>
+                  ))}
+                </datalist>
+                <span style={{ fontSize: '0.75rem', color: 'var(--neutral-text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                  Select an existing registered user or type their email address.
+                </span>
+              </div>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', fontWeight: '600', fontSize: '0.88rem', marginBottom: '0.4rem' }}>Club Role</label>
+                <select
+                  value={addMemberRole}
+                  onChange={e => setAddMemberRole(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.95rem' }}
+                >
+                  <option value="Member">Member</option>
+                  <option value="Coordinator">Coordinator (Admin access for this club)</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn-secondary" onClick={() => setAddMemberModal(null)}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={addMemberLoading} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {addMemberLoading ? <RefreshCw size={14} className="spin" /> : <UserCheck size={14} />}
+                  Add Member
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

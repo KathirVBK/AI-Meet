@@ -1,30 +1,37 @@
+import os
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
+from sqlalchemy.orm import sessionmaker
 from api_server import app
-from database.connection import Base, engine, SessionLocal
+from database.connection import Base, get_db
 from database.models import User, Meeting, Club, ClubMember, Token
 import uuid
 import json
 
+test_engine = create_engine(
+    "sqlite://",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool
+)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+def override_get_db():
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)
 
 @pytest.fixture(scope="module")
 def setup_db():
-    Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    
-    # Clean up previous data
-    db.query(Token).delete()
-    db.query(Meeting).delete()
-    db.query(ClubMember).delete()
-    db.query(Club).delete()
-    db.query(User).delete()
-    
-    from database.models import Role, Permission, RolePermission
-    db.query(RolePermission).delete()
-    db.query(Role).delete()
-    db.query(Permission).delete()
-    db.commit()
+    Base.metadata.drop_all(bind=test_engine)
+    Base.metadata.create_all(bind=test_engine)
+    db = TestingSessionLocal()
 
     # Seed RBAC
     from services.rbac_service import seed_rbac
@@ -89,13 +96,9 @@ def setup_db():
     }
 
     # Teardown
-    db.query(Token).delete()
-    db.query(Meeting).delete()
-    db.query(ClubMember).delete()
-    db.query(Club).delete()
-    db.query(User).delete()
-    db.commit()
     db.close()
+    Base.metadata.drop_all(bind=test_engine)
+    app.dependency_overrides.pop(get_db, None)
 
 # Tests based on the requirements
 

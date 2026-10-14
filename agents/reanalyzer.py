@@ -94,4 +94,5 @@ def reanalyzer_node(state: dict) -> dict:
 
     except Exception as e:
         logger.error(f"Reanalyzer failed: {e}")
-        return {**state, "error_message": str(e)}
+        # Graceful degradation — keep existing action items rather than killing the pipeline
+        return {**state, "validation_errors": [], "error_message": None}

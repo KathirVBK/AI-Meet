@@ -58,9 +58,11 @@ def validator_node(state: dict) -> dict:
 
     max_retries = 3
     for attempt in range(max_retries):
-        wait_time = 30 * (attempt + 1)
-        logger.info("Rate limit cooldown: waiting %ds before validator attempt %d/%d", wait_time, attempt + 1, max_retries)
-        time.sleep(wait_time)
+        if attempt > 0:
+            # Only sleep on retries to handle rate limits, not on first attempt
+            wait_time = 30 * attempt  # 30s, 60s
+            logger.info("Rate limit cooldown: waiting %ds before validator attempt %d/%d", wait_time, attempt + 1, max_retries)
+            time.sleep(wait_time)
 
         try:
             transcript = state.get("transcript", "")

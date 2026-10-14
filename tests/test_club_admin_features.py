@@ -3,15 +3,30 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from api_server import app
-from database.connection import Base, engine, SessionLocal
+from database.connection import Base, get_db
 from database.models import User, Meeting, Club, ClubMember, Token, ActionItem
 import json
 
+TEST_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "test_club_admin.db")
+test_engine = create_engine(f"sqlite:///{TEST_DB_PATH}", connect_args={"check_same_thread": False})
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+def override_get_db():
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)
 
 def test_club_admin_features_flow():
-    db = SessionLocal()
+    Base.metadata.create_all(bind=test_engine)
+    db = TestingSessionLocal()
     
     # 1. Setup test users and token
     test_admin = db.query(User).filter(User.email == "test_club_admin@example.com").first()
@@ -128,6 +143,13 @@ def test_club_admin_features_flow():
     assert res_del_tpl.status_code == 200
     
     db.close()
+    Base.metadata.drop_all(bind=test_engine)
+    app.dependency_overrides.pop(get_db, None)
+    if os.path.exists(TEST_DB_PATH):
+        try:
+            os.remove(TEST_DB_PATH)
+        except Exception:
+            pass
     print("ALL 5 CLUB ADMIN BACKEND FEATURES VERIFIED SUCCESSFULLY!")
 
 if __name__ == "__main__":

@@ -191,8 +191,7 @@ def get_all_meetings(db: Session, current_user: Optional[dict] = None) -> List[d
         # ADMIN can view all meetings for clubs they coordinate (including pending), or normal approved meetings
         from database.models import ClubMember
         coordinated_clubs = db.query(Club.name).join(ClubMember).filter(
-            ClubMember.user_id == user_id,
-            ClubMember.role == "Coordinator"
+            ClubMember.user_id == user_id
         ).subquery()
         
         user_clubs = [c.get("club_name") for c in current_user.get("clubs", [])]
@@ -299,7 +298,9 @@ def get_stats(db: Session) -> dict:
     total_high = sum(
         1 for m in meetings for ai in m.action_items if ai.priority == "High"
     )
-    clubs = list(set(m.club_name for m in meetings if m.club_name))
+    db_clubs = [c.name for c in db.query(Club).filter(Club.is_active == True).all()]
+    meeting_clubs = [m.club_name for m in meetings if m.club_name]
+    clubs = sorted(list(set(db_clubs + meeting_clubs)))
     return {
         "total_meetings": len(meetings),
         "total_action_items": total_action_items,
@@ -319,8 +320,7 @@ def get_pending_meetings(db: Session, current_user: dict) -> List[dict]:
     elif global_role == "ADMIN":
         from database.models import ClubMember
         coordinated_clubs = db.query(Club.name).join(ClubMember).filter(
-            ClubMember.user_id == user_id,
-            ClubMember.role == "Coordinator"
+            ClubMember.user_id == user_id
         ).subquery()
         query = query.filter(Meeting.club_name.in_(coordinated_clubs))
     else:
@@ -356,8 +356,7 @@ def get_club_action_items(db: Session, current_user: dict, club_id: Optional[str
     elif global_role != "SUPER_ADMIN":
         from database.models import ClubMember
         coordinated_club_ids = db.query(ClubMember.club_id).filter(
-            ClubMember.user_id == user_id,
-            ClubMember.role == "Coordinator"
+            ClubMember.user_id == user_id
         ).subquery()
         query = query.filter(Meeting.club_id.in_(coordinated_club_ids))
         

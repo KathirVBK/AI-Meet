@@ -46,11 +46,31 @@ const proxyJson = async (req, res) => {
 app.post('/api/auth/register', proxyJson);
 app.post('/api/auth/login', proxyJson);
 app.get('/api/clubs', proxyJson);
+app.get('/api/user', proxyJson);
+app.get('/api/user/clubs', proxyJson);
 app.put('/api/user', proxyJson);
 app.post('/api/chat', proxyJson);
 app.get('/api/meetings/history', proxyJson);
 app.get('/api/meetings/:id', proxyJson);
 app.put('/api/meetings/:id', proxyJson);
+
+// PDF export — streams binary from Python API with auth forwarded
+app.get('/api/meetings/:id/export-pdf', async (req, res) => {
+    try {
+        const response = await axios({
+            method: 'GET',
+            url: `${PYTHON_API_URL}/api/meetings/${req.params.id}/export-pdf`,
+            headers: { 'Authorization': req.headers['authorization'] || '' },
+            responseType: 'stream',
+        });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', response.headers['content-disposition'] || 'attachment; filename="minutes.pdf"');
+        response.data.pipe(res);
+    } catch (error) {
+        console.error('PDF export proxy error:', error.response?.data || error.message);
+        res.status(error.response?.status || 500).json({ error: 'PDF export failed' });
+    }
+});
 
 // Admin routes & Club Admin features
 app.get('/api/admin/stats', proxyJson);

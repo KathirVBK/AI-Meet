@@ -127,6 +127,8 @@ def get_club_details(db: Session, club_id: str) -> Optional[Dict]:
         "is_active": club.is_active,
         "roster": roster,
         "meetings": meeting_list,
+        "member_count": len(roster),
+        "meeting_count": len(meeting_list),
     }
 
 def update_club_member_role(db: Session, club_id: str, user_id: str, role: str) -> bool:

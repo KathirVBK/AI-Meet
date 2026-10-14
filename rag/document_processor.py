@@ -21,6 +21,7 @@ def create_meeting_documents(
     meeting_date: str,
     meeting_title: Optional[str] = None,
     decisions: Optional[List[dict]] = None,
+    meeting_id: Optional[str] = None,
 ) -> List[Document]:
     """
     Create LangChain Document chunks from meeting transcript and MoM text.
@@ -57,6 +58,7 @@ def create_meeting_documents(
                     "meeting_title": meeting_title or f"{club_name} Meeting",
                     "chunk_index": i,
                     "total_chunks": len(transcript_chunks),
+                    "meeting_id": meeting_id or "",
                 },
             ))
 
@@ -73,6 +75,7 @@ def create_meeting_documents(
                     "meeting_title": meeting_title or f"{club_name} Meeting",
                     "chunk_index": i,
                     "total_chunks": len(mom_chunks),
+                    "meeting_id": meeting_id or "",
                 },
             ))
 
@@ -96,6 +99,7 @@ def create_meeting_documents(
                     "meeting_date": meeting_date,
                     "meeting_title": meeting_title or f"{club_name} Meeting",
                     "decision_index": i,
+                    "meeting_id": meeting_id or "",
                 },
             ))
 

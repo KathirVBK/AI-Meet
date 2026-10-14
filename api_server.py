@@ -12,12 +12,14 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from database.connection import init_db, get_db, SessionLocal
+from database.models import Club
 from services.user_service import register_user, login_user, get_user_by_token, update_user_profile, get_all_users, update_user_role, update_user_status, add_user_to_club, remove_user_from_club, get_user_by_email
 from services.admin_service import log_audit_action, get_all_audit_logs, get_system_settings, update_system_setting
 from services.rbac_service import (
     seed_rbac, has_permission, get_all_roles, get_all_permissions, 
     assign_permission_to_role, remove_permission_from_role,
-    can_access_meeting, is_coordinator_for_club_by_id, is_coordinator_for_club_by_name
+    can_access_meeting, is_coordinator_for_club_by_id, is_coordinator_for_club_by_name,
+    is_member_or_coordinator_for_club
 )
 from services.club_service import (
     get_all_clubs_admin, create_club, update_club, update_club_status, get_club_details,
@@ -54,16 +56,18 @@ app.add_middleware(
 # ── Database initialisation on every startup ─────────────────────────────────
 @app.on_event("startup")
 async def startup_event():
-    """Ensure all database tables exist and RBAC is seeded."""
+    """Ensure all database tables exist, RBAC is seeded, and default accounts exist."""
     from database.connection import init_db
     init_db()  # Create tables if they don't exist
-    # Seed RBAC roles and permissions
+    # Seed RBAC roles and permissions, clubs, and default users
     db = SessionLocal()
     try:
         from services.rbac_service import seed_rbac
+        from database.seed import seed_all
         seed_rbac(db)
+        seed_all(db)
     except Exception as e:
-        logger.warning(f"RBAC seed warning: {e}")
+        logger.warning(f"Startup seed warning: {e}")
     finally:
         db.close()
 
@@ -188,14 +192,25 @@ async def process_audio(
     """
     temp_path: Optional[str] = None
     try:
+        # ── 0. Strict Club Authorization Check ─────────────────────────────
+        club_clean = (club_name or "").strip()
+        if not club_clean:
+            raise HTTPException(status_code=400, detail="Club name is required.")
+            
+        if not is_member_or_coordinator_for_club(db, current_user, club_clean):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Access denied: You are not a member or coordinator of '{club_clean}'. You can only generate meeting MOMs for clubs you belong to."
+            )
+
         # ── 1. Save uploaded file temporarily ──────────────────────────────
         temp_dir = tempfile.gettempdir()
-        safe_stem = os.path.basename(file.filename or f"upload_{abs(hash((club_name, meeting_date)))}.wav")
+        safe_stem = os.path.basename(file.filename or f"upload_{abs(hash((club_clean, meeting_date)))}.wav")
         temp_path = os.path.join(temp_dir, safe_stem)
         with open(temp_path, "wb") as f:
             f.write(await file.read())
 
-        meeting_name = f"{club_name}_{meeting_date.replace(' ', '_')}"
+        meeting_name = f"{club_clean}_{meeting_date.replace(' ', '_')}"
 
         # ── 2. Speaker-aware transcription pipeline ────────────────────────
         logger.info("Starting speaker-aware pipeline for %s", safe_stem)
@@ -244,14 +259,25 @@ async def process_audio(
         if isinstance(final_state.get("mom_data"), dict) and meeting_type:
             final_state["mom_data"]["meeting_type"] = meeting_type
 
+        # Non-fatal workflow errors: if we have action items already extracted
+        # (e.g. reanalyzer failed) don't abort — just log and continue.
         if final_state.get("error_message"):
-            raise HTTPException(status_code=500, detail=final_state["error_message"])
+            action_items_available = bool(final_state.get("extracted_action_items"))
+            if not action_items_available:
+                raise HTTPException(status_code=500, detail=final_state["error_message"])
+            logger.warning("Workflow reported a non-fatal error (continuing with partial output): %s",
+                           final_state["error_message"])
 
         # ── 5. Build final outputs ─────────────────────────────────────────
         action_items_raw = final_state.get("extracted_action_items", [])
         action_items = _normalise_action_items_for_output(action_items_raw)
         mom_md = final_state.get("mom", "")
         mom_data = final_state.get("mom_data") or {}
+
+        # ── Sync action_items back into mom_data so the stored JSON and the
+        #    action_items DB table always match each other. ─────────────────
+        if isinstance(mom_data, dict):
+            mom_data["action_items"] = action_items
 
         # Ensure mom_data also carries participants/speaker_mapping/segments
         if not mom_data.get("participants") and participants:
@@ -264,9 +290,8 @@ async def process_audio(
         # Determine initial approval status
         approval_status = "APPROVED"
         user_role = current_user.get("global_role")
-        if club_obj and club_obj.require_approval:
-            if user_role != "SUPER_ADMIN" and not is_coordinator_for_club_by_name(db, current_user, club_name):
-                approval_status = "PENDING_REVIEW"
+        if user_role != "SUPER_ADMIN" and not is_coordinator_for_club_by_name(db, current_user, club_name):
+            approval_status = "PENDING_REVIEW"
 
         # ── 6. Persist ─────────────────────────────────────────────────────
         # History service
@@ -288,7 +313,7 @@ async def process_audio(
             approval_status=approval_status,
         )
 
-        # ChromaDB
+        # ChromaDB — indexed after meeting is persisted so meeting_id is available
         try:
             docs = await run_in_threadpool(
                 create_meeting_documents,
@@ -298,6 +323,7 @@ async def process_audio(
                 meeting_date=meeting_date,
                 meeting_title=mom_data.get("meeting_title") if mom_data else None,
                 decisions=mom_data.get("decisions") if mom_data else None,
+                meeting_id=entry_id,
             )
             await run_in_threadpool(add_documents_to_store, docs)
         except Exception as e:
@@ -490,6 +516,44 @@ async def update_user(request: UserUpdateRequest, current_user: dict = Depends(g
         "success": True, 
         "user": updated_user
     }
+
+
+@app.get("/api/user")
+async def get_current_user_profile(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Return the profile of the currently authenticated user including active clubs."""
+    user = get_user_by_email(db, current_user["email"])
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"success": True, "user": user}
+
+
+@app.get("/api/user/clubs")
+async def get_current_user_clubs(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Return only the clubs the currently authenticated user belongs to (or all active clubs if SUPER_ADMIN)."""
+    user_id = current_user.get("id")
+    global_role = current_user.get("global_role")
+    
+    if global_role == "SUPER_ADMIN":
+        clubs = db.query(Club).filter(Club.is_active == True).all()
+        return {
+            "success": True,
+            "clubs": [{"id": c.id, "name": c.name, "role": "Super Admin"} for c in clubs]
+        }
+        
+    from database.models import ClubMember
+    memberships = db.query(ClubMember).join(Club).filter(
+        ClubMember.user_id == user_id,
+        ClubMember.status == "Active",
+        Club.is_active == True
+    ).all()
+    
+    result = [{
+        "id": m.club.id,
+        "name": m.club.name,
+        "role": m.role
+    } for m in memberships if m.club]
+    
+    return {"success": True, "clubs": result}
 
 @app.post("/api/auth/register")
 async def register(request: RegisterRequest, db: Session = Depends(get_db)):
@@ -878,7 +942,7 @@ async def add_member_by_email(club_id: str, request: dict, db: Session = Depends
         if not is_coordinator_for_club_by_id(db, admin, club_id):
             raise HTTPException(status_code=403, detail="You can only manage members for clubs where you are a Coordinator")
         
-    add_user_to_club(db, user.get("id"), details["name"], role)
+    add_user_to_club(db, user.get("id"), club_id, role)
     log_audit_action(db, admin.get("id"), admin.get("email"), "MEMBER_ADDED", {
         "target_entity": "Club",
         "target_id": club_id,
@@ -1018,7 +1082,159 @@ async def revoke_role_permission(role_name: str, permission_name: str, db: Sessi
     })
     return {"success": True}
 
+@app.get("/api/clubs/{club_name}/agenda-templates")
+async def get_agenda_templates(club_name: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    return {"success": True, "templates": []}
+
+
+@app.get("/api/meetings/{meeting_id}/export-pdf")
+async def export_meeting_pdf(
+    meeting_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Generate and stream a PDF for a given meeting.
+    Auth-protected: user must have access to the meeting.
+    Routing: User → React → API server (auth) → PDF generation → streamed response.
+    """
+    from fastapi.responses import StreamingResponse
+    import io
+
+    # 1. Load meeting from DB (enforces existence check)
+    meeting = get_meeting_by_id(db, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    # 2. RBAC: user must belong to the club or be an admin
+    user_role = current_user.get("global_role", "")
+    user_clubs = [c.get("club_name") for c in current_user.get("clubs", [])]
+    club_name = meeting.get("club_name", "")
+    if user_role not in ("SUPER_ADMIN", "ADMIN") and club_name not in user_clubs:
+        raise HTTPException(status_code=403, detail="Access denied to this meeting")
+
+    # 3. Build PDF with ReportLab
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4,
+            rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm,
+            title=meeting.get("title") or "Minutes of Meeting",
+        )
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle("Title", parent=styles["Title"], fontSize=18, textColor=colors.HexColor("#1e3a5f"), spaceAfter=6)
+        h2_style    = ParagraphStyle("H2",    parent=styles["Heading2"], fontSize=12, textColor=colors.HexColor("#2563eb"), spaceBefore=12, spaceAfter=4)
+        body_style  = ParagraphStyle("Body",  parent=styles["Normal"], fontSize=10, leading=14)
+        small_style = ParagraphStyle("Small", parent=styles["Normal"], fontSize=9, textColor=colors.grey)
+
+        mom_data = meeting.get("mom_data") or {}
+        action_items = meeting.get("action_items") or mom_data.get("action_items") or []
+        decisions    = meeting.get("decisions") or mom_data.get("decisions") or []
+        participants = meeting.get("participants") or mom_data.get("attendees") or []
+
+        story = []
+
+        # Header
+        story.append(Paragraph(mom_data.get("meeting_title") or meeting.get("title") or "Minutes of Meeting", title_style))
+        story.append(Paragraph(f"{mom_data.get('club_name') or club_name}", small_style))
+        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2563eb"), spaceAfter=8))
+
+        # Meta table
+        meta = [
+            ["Date", meeting.get("meeting_date") or mom_data.get("date") or "N/A"],
+            ["Venue", mom_data.get("venue") or "N/A"],
+            ["Prepared By", "AI Meeting Assistant (MeetMind)"],
+            ["Approval Status", meeting.get("approval_status") or "APPROVED"],
+        ]
+        meta_table = Table(meta, colWidths=[4*cm, 13*cm])
+        meta_table.setStyle(TableStyle([
+            ("FONTNAME", (0,0), (0,-1), "Helvetica-Bold"),
+            ("FONTSIZE", (0,0), (-1,-1), 9),
+            ("BACKGROUND", (0,0), (0,-1), colors.HexColor("#eff6ff")),
+            ("TEXTCOLOR", (0,0), (0,-1), colors.HexColor("#1e3a5f")),
+            ("ROWBACKGROUNDS", (0,0), (-1,-1), [colors.white, colors.HexColor("#f8fafc")]),
+            ("GRID", (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
+            ("PADDING", (0,0), (-1,-1), 4),
+        ]))
+        story.append(meta_table)
+        story.append(Spacer(1, 0.4*cm))
+
+        # Attendees
+        if participants:
+            story.append(Paragraph("Attendees", h2_style))
+            for p in participants:
+                story.append(Paragraph(f"• {p}", body_style))
+            story.append(Spacer(1, 0.3*cm))
+
+        # Summary
+        summary = mom_data.get("executive_summary") or mom_data.get("summary") or meeting.get("summary") or ""
+        if summary:
+            story.append(Paragraph("Executive Summary", h2_style))
+            story.append(Paragraph(summary, body_style))
+            story.append(Spacer(1, 0.3*cm))
+
+        # Decisions
+        if decisions:
+            story.append(Paragraph("Decisions Made", h2_style))
+            for d in decisions:
+                text = d.get("decision", str(d)) if isinstance(d, dict) else str(d)
+                status = d.get("status", "") if isinstance(d, dict) else ""
+                story.append(Paragraph(f"• {text}" + (f" <i>({status})</i>" if status else ""), body_style))
+            story.append(Spacer(1, 0.3*cm))
+
+        # Action Items table
+        if action_items:
+            story.append(Paragraph("Action Items", h2_style))
+            ai_data = [["#", "Task", "Owner", "Deadline", "Priority", "Status"]]
+            for idx, ai in enumerate(action_items, 1):
+                ai_data.append([
+                    str(idx),
+                    ai.get("task") or ai.get("task", ""),
+                    ai.get("owner") or ai.get("person") or "TBD",
+                    ai.get("deadline") or "N/A",
+                    ai.get("priority") or "Medium",
+                    ai.get("status") or "Assigned",
+                ])
+            ai_table = Table(ai_data, colWidths=[0.8*cm, 6*cm, 3*cm, 2.5*cm, 2*cm, 2.5*cm])
+            ai_table.setStyle(TableStyle([
+                ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#2563eb")),
+                ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+                ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+                ("FONTSIZE", (0,0), (-1,-1), 8),
+                ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#f0f9ff")]),
+                ("GRID", (0,0), (-1,-1), 0.4, colors.HexColor("#cbd5e1")),
+                ("PADDING", (0,0), (-1,-1), 4),
+                ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ]))
+            story.append(ai_table)
+            story.append(Spacer(1, 0.3*cm))
+
+        doc.build(story)
+        buf.seek(0)
+
+        safe_title = (meeting.get("title") or "meeting").replace(" ", "_")[:40]
+        filename = f"minutes_{safe_title}_{meeting_id[:6]}.pdf"
+        return StreamingResponse(
+            buf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    except ImportError:
+        raise HTTPException(status_code=500, detail="PDF generation library not available. Install reportlab.")
+    except Exception as e:
+        logger.error("PDF export failed for meeting %s: %s", meeting_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api_server:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("api_server:app", host="0.0.0.0", port=8000, reload=True)

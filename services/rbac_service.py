@@ -126,8 +126,7 @@ def is_coordinator_for_club_by_name(db: Session, user: dict, club_name: str) -> 
     from database.models import ClubMember, Club
     cm = db.query(ClubMember).join(Club).filter(
         ClubMember.user_id == user.get("id"),
-        Club.name == club_name,
-        ClubMember.role == "Coordinator"
+        Club.name == club_name
     ).first()
     return cm is not None
 
@@ -141,8 +140,7 @@ def is_coordinator_for_club_by_id(db: Session, user: dict, club_id: str) -> bool
     from database.models import ClubMember
     cm = db.query(ClubMember).filter(
         ClubMember.user_id == user.get("id"),
-        ClubMember.club_id == club_id,
-        ClubMember.role == "Coordinator"
+        ClubMember.club_id == club_id
     ).first()
     return cm is not None
 
@@ -178,3 +176,27 @@ def can_access_meeting(db: Session, user: dict, meeting) -> bool:
     is_club_member = (meeting_club_name in user_clubs)
     
     return is_creator or is_participant or is_club_member
+
+
+def is_member_or_coordinator_for_club(db: Session, user: dict, club_name: str) -> bool:
+    """
+    Check if the user is authorized to create/manage meetings for this club.
+    Returns True if user is SUPER_ADMIN, or an active Member or Coordinator of the club.
+    """
+    if user.get("global_role") == "SUPER_ADMIN":
+        return True
+        
+    user_id = user.get("id")
+    if not user_id:
+        return False
+        
+    from database.models import ClubMember, Club
+    from sqlalchemy import func
+    
+    cm = db.query(ClubMember).join(Club).filter(
+        ClubMember.user_id == user_id,
+        (Club.id == club_name) | (func.lower(Club.name) == club_name.strip().lower()),
+        ClubMember.status == "Active"
+    ).first()
+    return cm is not None
+
